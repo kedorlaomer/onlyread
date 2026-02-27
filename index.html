@@ -2,8 +2,21 @@
 <html>
 <head>
     <title>Hello World</title>
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
-    <h1>Hello World</h1>
+    <div id="login-page">
+        <h1>Please Log In</h1>
+        <button id="login-btn">Log In</button>
+    </div>
+
+    <div id="user-page" style="display: none;">
+        <h1>Welcome!</h1>
+        <h2>Your Token</h2>
+        <pre id="token-display"></pre>
+        <button id="logout-btn">Log Out</button>
+    </div>
+
+    <script type="module" src="auth.js"></script>
 </body>
 </html>
