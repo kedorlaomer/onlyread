@@ -3,8 +3,8 @@ function log(...args) {
     if (DEBUG) console.log('[BlobWorker]', ...args);
 }
 
-let blobClient = null;
 let userId = null;
+let siteId = null;
 let syncInterval = null;
 
 function validateUUID(uuid) {
@@ -12,11 +12,31 @@ function validateUUID(uuid) {
     return uuidRegex.test(uuid);
 }
 
+function getBlobURL(key) {
+    return `/.netlify/blobs/user-data/${key}.json`;
+}
+
+async function fetchBlob(key, options = {}) {
+    const url = getBlobURL(key);
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        }
+    });
+    if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Blob fetch failed: ${response.status}`);
+    }
+    return response.json();
+}
+
 async function syncFromBlob() {
-    if (!blobClient || !userId) return;
+    if (!userId) return;
 
     try {
-        const data = await blobClient.getJSON(userId);
+        const data = await fetchBlob(userId);
         if (data) {
             self.postMessage({ type: 'syncFromBlob', data });
             log('Synced from blob:', Object.keys(data));
@@ -27,10 +47,13 @@ async function syncFromBlob() {
 }
 
 async function syncToBlob(data) {
-    if (!blobClient || !userId) return;
+    if (!userId) return;
 
     try {
-        await blobClient.setJSON(userId, data);
+        await fetchBlob(userId, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
         log('Synced to blob:', Object.keys(data));
         self.postMessage({ type: 'synced' });
     } catch (e) {
@@ -59,8 +82,7 @@ self.onmessage = async function(e) {
     switch (type) {
         case 'init':
             userId = payload.userId;
-            const { Blob } = await import('@netlify/blobs');
-            blobClient = new Blob('user-data', { siteId: payload.siteId });
+            siteId = payload.siteId;
             log('Worker initialized with userId:', userId);
             await syncFromBlob();
             startSync();
