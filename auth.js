@@ -7,7 +7,7 @@ const userNameDisplay = document.getElementById('user-name');
 
 function getUserName(user) {
     const metadata = user.user_metadata || {};
-    return metadata.full_name || metadata.name || user.identity.email || 'User';
+    return metadata.full_name || metadata.name || user.identity?.email || 'User';
 }
 
 function updateUI() {
@@ -18,9 +18,9 @@ function updateUI() {
         userNameDisplay.textContent = getUserName(user);
         const userData = {
             token: user.token,
-            identity: user.identity,
-            user_metadata: user.user_metadata,
-            app_metadata: user.app_metadata
+            identity: user.identity || {},
+            user_metadata: user.user_metadata || {},
+            app_metadata: user.app_metadata || {}
         };
         tokenDisplay.textContent = JSON.stringify(userData, null, 2);
     } else {
