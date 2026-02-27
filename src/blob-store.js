@@ -59,6 +59,7 @@ export function createBlobStore() {
     let worker = null;
     let currentUserId = null;
     let ready = false;
+    let blobAvailable = false;
     const pendingCallbacks = [];
 
     function ensureReady() {
@@ -92,7 +93,9 @@ export function createBlobStore() {
 
                 switch (type) {
                     case 'ready':
+                        blobAvailable = e.data.blobAvailable;
                         ready = true;
+                        log('Store ready, blob available:', blobAvailable);
                         processPendingCallbacks();
                         break;
 
