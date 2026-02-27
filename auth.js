@@ -5,9 +5,24 @@ const logoutBtn = document.getElementById('logout-btn');
 const tokenDisplay = document.getElementById('token-display');
 const userNameDisplay = document.getElementById('user-name');
 
+function decodeJWT(token) {
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        const payload = parts[1];
+        const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(decoded);
+    } catch (e) {
+        return null;
+    }
+}
+
 function getUserName(user) {
     const metadata = user.user_metadata || {};
-    return metadata.full_name || metadata.name || user.identity?.email || 'User';
+    const emailFromIdentity = user.identity?.email;
+    const jwtPayload = decodeJWT(user.token);
+    const emailFromJWT = jwtPayload?.email;
+    return metadata.full_name || metadata.name || emailFromIdentity || emailFromJWT || 'User';
 }
 
 function updateUI() {
