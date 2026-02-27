@@ -1,0 +1,12 @@
+[build]
+  command = ""
+  publish = "public"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npx serve public"
+  port = 3000
+  targetPort = 3000
+
+[functions]
+  node_bundler = "esbuild"

@@ -15,19 +15,19 @@ function validateUUID(uuid) {
 
 async function checkBlobAvailability() {
     try {
-        const response = await fetch('/.netlify/blobs/');
-        blobAvailable = response.ok || response.status === 404;
+        const response = await fetch('/.netlify/functions/store');
+        blobAvailable = response.ok || response.status >= 400 && response.status < 500;
     } catch (e) {
         blobAvailable = false;
     }
-    log('Blob available:', blobAvailable);
+    log('Blob available via function:', blobAvailable);
 }
 
 async function syncFromBlob() {
     if (!userId || !blobAvailable) return;
 
     try {
-        const response = await fetch(`/.netlify/blobs/user-data/${userId}.json`);
+        const response = await fetch(`/.netlify/functions/store/${userId}`);
         if (response.status === 404) {
             log('No existing blob data (first time user)');
             return;
@@ -36,7 +36,7 @@ async function syncFromBlob() {
             throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
-        if (data) {
+        if (data && Object.keys(data).length > 0) {
             self.postMessage({ type: 'syncFromBlob', data });
             log('Synced from blob:', Object.keys(data));
         }
@@ -52,7 +52,7 @@ async function syncToBlob(data) {
     }
 
     try {
-        const response = await fetch(`/.netlify/blobs/user-data/${userId}.json`, {
+        const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
