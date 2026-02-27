@@ -1,9 +1,20 @@
+import { createBlobStore } from './blob-store.js';
+
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
 const loginBtn = document.getElementById('login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const tokenDisplay = document.getElementById('token-display');
+
+let blobStore = null;
+
 const userNameDisplay = document.getElementById('user-name');
+const storageKeyInput = document.getElementById('storage-key');
+const storageValueInput = document.getElementById('storage-value');
+const storageResult = document.getElementById('storage-result');
+const storageSetBtn = document.getElementById('storage-set-btn');
+const storageGetBtn = document.getElementById('storage-get-btn');
+const storageSyncBtn = document.getElementById('storage-sync-btn');
 
 const DEBUG = true;
 function log(...args) {
@@ -84,18 +95,61 @@ logoutBtn.addEventListener('click', () => {
     updateUI();
 });
 
-netlifyIdentity.on('login', (user) => {
+netlifyIdentity.on('login', async (user) => {
     log('Login event fired, user:', user);
+    const jwtPayload = decodeJWT(user.token);
+    if (jwtPayload?.sub) {
+        blobStore = createBlobStore();
+        await blobStore.init(jwtPayload.sub);
+        log('Blob store initialized for user:', jwtPayload.sub);
+    }
     updateUI();
 });
 
 netlifyIdentity.on('logout', () => {
     log('Logout event fired');
+    if (blobStore) {
+        blobStore.destroy();
+        blobStore = null;
+    }
     updateUI();
 });
 
 netlifyIdentity.on('error', (err) => {
     log('Netlify Identity error:', err);
+});
+
+storageSetBtn.addEventListener('click', () => {
+    const key = storageKeyInput.value;
+    const valueStr = storageValueInput.value;
+    if (!key) {
+        storageResult.textContent = 'Please enter a key';
+        return;
+    }
+    let value;
+    try {
+        value = valueStr ? JSON.parse(valueStr) : null;
+    } catch (e) {
+        value = valueStr;
+    }
+    blobStore.set(key, value);
+    storageResult.textContent = `Set: ${key} = ${JSON.stringify(value)}`;
+});
+
+storageGetBtn.addEventListener('click', () => {
+    const key = storageKeyInput.value;
+    if (!key) {
+        storageResult.textContent = 'Please enter a key';
+        return;
+    }
+    const value = blobStore.get(key);
+    storageResult.textContent = `Get: ${key} = ${JSON.stringify(value)}`;
+});
+
+storageSyncBtn.addEventListener('click', async () => {
+    storageResult.textContent = 'Syncing...';
+    await blobStore.syncNow();
+    storageResult.textContent = 'Synced!';
 });
 
 log('Script initialized');
