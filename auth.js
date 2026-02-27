@@ -12,8 +12,13 @@ function log(...args) {
 
 function decodeJWT(token) {
     if (typeof token !== 'string') {
-        log('Token is not a string, type:', typeof token, 'value:', token);
-        return null;
+        if (token && token.access_token) {
+            log('Token is object, extracting access_token');
+            token = token.access_token;
+        } else {
+            log('Token is not a string, type:', typeof token);
+            return null;
+        }
     }
     try {
         const parts = token.split('.');
