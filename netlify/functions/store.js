@@ -1,6 +1,10 @@
 const { getStore } = require('@netlify/blobs');
 
-const store = getStore('user-data');
+const store = getStore({
+    name: 'user-data',
+    siteID: process.env.SITE_ID,
+    token: process.env.NETLIFY_BLOBS_TOKEN
+});
 
 exports.handler = async (event, context) => {
     const headers = {
