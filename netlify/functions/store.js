@@ -1,12 +1,17 @@
 const { getStore } = require('@netlify/blobs');
 
-const store = getStore({
-    name: 'user-data',
-    siteID: process.env.SITE_ID,
-    token: process.env.BLOB_TOKEN
-});
-
-console.log('Store initialized, SITE_ID:', process.env.SITE_ID, 'has token:', !!process.env.NETLIFY_BLOBS_TOKEN);
+let store;
+try {
+    store = getStore({
+        name: 'user-data',
+        siteID: process.env.SITE_ID,
+        token: process.env.BLOB_TOKEN
+    });
+    console.log('Store initialized, SITE_ID:', process.env.SITE_ID, 'has token:', !!process.env.BLOB_TOKEN);
+} catch (initErr) {
+    console.log('Store init error:', initErr.message);
+    store = null;
+}
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -46,7 +51,11 @@ exports.handler = async (event, context) => {
         if (event.httpMethod === 'GET') {
             console.log('Getting data for user:', userId);
             let data;
-            try {
+    if (!store) {
+        return { statusCode: 500, headers, body: JSON.stringify({ error: 'Blobs not configured' }) };
+    }
+
+    try {
                 data = await store.get(userId, { type: 'json' });
             } catch (getErr) {
                 console.log('Get error:', getErr.message);
