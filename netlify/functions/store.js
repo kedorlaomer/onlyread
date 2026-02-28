@@ -20,6 +20,7 @@ exports.handler = async (event, context) => {
     }
 
     const pathParts = event.path.split('/').filter(Boolean);
+    console.log('Full path:', event.path, 'Parts:', pathParts);
     const userId = pathParts[pathParts.length - 1];
 
     if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {

@@ -16,7 +16,7 @@ function validateUUID(uuid) {
 async function checkBlobAvailability() {
     try {
         const response = await fetch('/.netlify/functions/store');
-        blobAvailable = response.ok || response.status >= 400 && response.status < 500;
+        blobAvailable = response.ok;
     } catch (e) {
         blobAvailable = false;
     }
