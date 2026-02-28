@@ -6,6 +6,8 @@ const store = getStore({
     token: process.env.NETLIFY_BLOBS_TOKEN
 });
 
+console.log('Store initialized, SITE_ID:', process.env.SITE_ID, 'has token:', !!process.env.NETLIFY_BLOBS_TOKEN);
+
 exports.handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
