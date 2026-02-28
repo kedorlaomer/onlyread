@@ -7,9 +7,9 @@ try {
         siteID: process.env.SITE_ID,
         token: process.env.BLOB_TOKEN
     });
-    console.log('Store initialized, SITE_ID:', process.env.SITE_ID, 'has token:', !!process.env.BLOB_TOKEN);
-} catch (initErr) {
-    console.log('Store init error:', initErr.message);
+    console.log('Store init OK, SITE_ID:', process.env.SITE_ID);
+} catch (err) {
+    console.log('Store init failed:', err.message);
     store = null;
 }
 
@@ -25,50 +25,37 @@ exports.handler = async (event, context) => {
     }
 
     const pathParts = event.path.split('/').filter(Boolean);
-    console.log('Full path:', event.path, 'Parts:', pathParts);
-
-    // Health check endpoint - support various path formats
     const lastPart = pathParts[pathParts.length - 1];
     const secondLastPart = pathParts[pathParts.length - 2];
-    
-    if (lastPart === 'store' || (lastPart === 'index' && secondLastPart === 'store')) {
-        console.log('Health check hit');
-        return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
-    }
 
-    if (pathParts.length === 2 && pathParts[0] === 'store') {
-        console.log('Health check hit (2 parts)');
+    // Health check
+    if (lastPart === 'store' || (lastPart === 'index' && secondLastPart === 'store')) {
         return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
     }
 
     const userId = pathParts[pathParts.length - 1];
-
-    if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid or missing user ID' }) };
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    
+    if (!userId || !uuidRegex.test(userId)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid user ID' }) };
     }
 
-    try {
-        if (event.httpMethod === 'GET') {
-            console.log('Getting data for user:', userId);
-            let data;
     if (!store) {
         return { statusCode: 500, headers, body: JSON.stringify({ error: 'Blobs not configured' }) };
     }
 
     try {
+        if (event.httpMethod === 'GET') {
+            let data = null;
+            try {
                 data = await store.get(userId, { type: 'json' });
-            } catch (getErr) {
-                console.log('Get error:', getErr.message);
-                if (getErr.message.includes('not exist') || getErr.message.includes('404')) {
-                    data = null;
-                } else {
-                    throw getErr;
+            } catch (e) {
+                console.log('Get error:', e.message);
+                if (!e.message.includes('not exist') && !e.message.includes('404')) {
+                    throw e;
                 }
             }
-            console.log('Got data:', typeof data, data);
-            const jsonStr = JSON.stringify(data || {});
-            console.log('Stringified:', jsonStr);
-            return { statusCode: 200, headers, body: jsonStr };
+            return { statusCode: 200, headers, body: JSON.stringify(data || {}) };
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
@@ -79,6 +66,7 @@ exports.handler = async (event, context) => {
 
         return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
     } catch (error) {
+        console.log('Handler error:', error.message, error.stack);
         return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
     }
 };
