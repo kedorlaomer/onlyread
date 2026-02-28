@@ -3,7 +3,7 @@ const { getStore } = require('@netlify/blobs');
 const store = getStore({
     name: 'user-data',
     siteID: process.env.SITE_ID,
-    token: process.env.NETLIFY_BLOBS_TOKEN
+    token: process.env.BLOB_TOKEN
 });
 
 console.log('Store initialized, SITE_ID:', process.env.SITE_ID, 'has token:', !!process.env.NETLIFY_BLOBS_TOKEN);
