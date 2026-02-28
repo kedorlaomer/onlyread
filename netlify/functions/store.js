@@ -22,8 +22,11 @@ exports.handler = async (event, context) => {
     const pathParts = event.path.split('/').filter(Boolean);
     console.log('Full path:', event.path, 'Parts:', pathParts);
 
-    // Health check endpoint - no userId required
-    if (pathParts.length === 1 && pathParts[0] === 'store') {
+    // Health check endpoint - support various path formats
+    const lastPart = pathParts[pathParts.length - 1];
+    const secondLastPart = pathParts[pathParts.length - 2];
+    
+    if (lastPart === 'store' || (lastPart === 'index' && secondLastPart === 'store')) {
         console.log('Health check hit');
         return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
     }
