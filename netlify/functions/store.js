@@ -44,7 +44,9 @@ exports.handler = async (event, context) => {
 
     try {
         if (event.httpMethod === 'GET') {
+            console.log('Getting data for user:', userId);
             const data = await store.get(userId, { type: 'json' });
+            console.log('Got data:', typeof data, data);
             return { statusCode: 200, headers, body: JSON.stringify(data || {}) };
         }
 
