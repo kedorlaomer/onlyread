@@ -86,7 +86,7 @@ export function createBlobStore() {
             }
             currentUserId = userId;
 
-            worker = new Worker('../src/blob-worker.js', { type: 'module' });
+            worker = new Worker('js/blob-worker.js', { type: 'module' });
 
             worker.onmessage = (e) => {
                 const { type, data } = e.data;
