@@ -45,9 +45,21 @@ exports.handler = async (event, context) => {
     try {
         if (event.httpMethod === 'GET') {
             console.log('Getting data for user:', userId);
-            const data = await store.get(userId, { type: 'json' });
+            let data;
+            try {
+                data = await store.get(userId, { type: 'json' });
+            } catch (getErr) {
+                console.log('Get error:', getErr.message);
+                if (getErr.message.includes('not exist') || getErr.message.includes('404')) {
+                    data = null;
+                } else {
+                    throw getErr;
+                }
+            }
             console.log('Got data:', typeof data, data);
-            return { statusCode: 200, headers, body: JSON.stringify(data || {}) };
+            const jsonStr = JSON.stringify(data || {});
+            console.log('Stringified:', jsonStr);
+            return { statusCode: 200, headers, body: jsonStr };
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
