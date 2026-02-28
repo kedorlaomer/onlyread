@@ -14,17 +14,24 @@ function validateUUID(uuid) {
 }
 
 async function checkBlobAvailability() {
+    log('Checking blob availability...');
     try {
         const response = await fetch('/.netlify/functions/store');
         blobAvailable = response.ok;
+        log('Availability check response:', response.status, response.ok);
     } catch (e) {
         blobAvailable = false;
+        log('Availability check error:', e);
     }
     log('Blob available via function:', blobAvailable);
 }
 
 async function syncFromBlob() {
-    if (!userId || !blobAvailable) return;
+    log('syncFromBlob called, userId:', userId, 'blobAvailable:', blobAvailable);
+    if (!userId || !blobAvailable) {
+        log('syncFromBlob skipped');
+        return;
+    }
 
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`);
