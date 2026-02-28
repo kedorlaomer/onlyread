@@ -21,6 +21,12 @@ exports.handler = async (event, context) => {
 
     const pathParts = event.path.split('/').filter(Boolean);
     console.log('Full path:', event.path, 'Parts:', pathParts);
+
+    // Health check endpoint - no userId required
+    if (pathParts.length === 1 && pathParts[0] === 'store') {
+        return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
+    }
+
     const userId = pathParts[pathParts.length - 1];
 
     if (!userId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
