@@ -24,6 +24,12 @@ exports.handler = async (event, context) => {
 
     // Health check endpoint - no userId required
     if (pathParts.length === 1 && pathParts[0] === 'store') {
+        console.log('Health check hit');
+        return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
+    }
+
+    if (pathParts.length === 2 && pathParts[0] === 'store') {
+        console.log('Health check hit (2 parts)');
         return { statusCode: 200, headers, body: JSON.stringify({ status: 'ok' }) };
     }
 
