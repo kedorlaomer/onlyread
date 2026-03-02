@@ -7,7 +7,7 @@ try {
         siteID: process.env.SITE_ID,
         token: process.env.BLOB_TOKEN
     });
-    console.log('Store init OK, SITE_ID:', process.env.SITE_ID);
+    console.log('Store init OK');
 } catch (err) {
     console.log('Store init failed:', err.message);
 }
@@ -19,69 +19,58 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json'
     };
 
-    const sendResponse = (statusCode, data) => {
-        return {
-            statusCode,
-            headers,
-            body: JSON.stringify(data)
-        };
-    };
+    const send = (code, data) => ({ statusCode: code, headers, body: JSON.stringify(data) });
 
-    if (event.httpMethod === 'OPTIONS') {
-        return sendResponse(200, {});
+    if (event.httpMethod === 'OPTIONS') return send(200, {});
+
+    const parts = event.path.split('/').filter(Boolean);
+    const last = parts[parts.length - 1];
+
+    if (last === 'store' || last === 'index') return send(200, { status: 'ok' });
+
+    const userId = last;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+        return send(400, { error: 'Invalid user ID' });
     }
 
-    const pathParts = event.path.split('/').filter(Boolean);
-    const lastPart = pathParts[pathParts.length - 1];
-
-    // Health check
-    if (lastPart === 'store' || lastPart === 'index') {
-        return sendResponse(200, { status: 'ok' });
-    }
-
-    const userId = pathParts[pathParts.length - 1];
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    
-    if (!userId || !uuidRegex.test(userId)) {
-        return sendResponse(400, { error: 'Invalid user ID' });
-    }
-
-    if (!store) {
-        return sendResponse(500, { error: 'Blobs not configured' });
-    }
+    if (!store) return send(500, { error: 'Blobs not configured' });
 
     try {
         if (event.httpMethod === 'GET') {
-            let data = {};
             try {
-                const result = await store.get(userId, { type: 'json' });
-                data = (result !== undefined && result !== null) ? result : {};
-                console.log('Got data:', JSON.stringify(data));
+                const raw = await store.get(userId);
+                let data = {};
+                if (raw) {
+                    try {
+                        data = JSON.parse(raw);
+                    } catch {
+                        data = { _raw: raw };
+                    }
+                }
+                return send(200, data);
             } catch (e) {
                 console.log('Get error:', e.message);
                 if (e.message.includes('not exist') || e.message.includes('404')) {
-                    data = {};
-                } else {
-                    return sendResponse(500, { error: 'Get failed: ' + e.message });
+                    return send(200, {});
                 }
+                return send(500, { error: e.message });
             }
-            return sendResponse(200, data);
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
             let data;
             try {
                 data = JSON.parse(event.body);
-            } catch (e) {
-                return sendResponse(400, { error: 'Invalid JSON' });
+            } catch {
+                return send(400, { error: 'Invalid JSON' });
             }
-            await store.set(userId, data);
-            return sendResponse(200, { success: true });
+            await store.setJSON(userId, data);
+            return send(200, { success: true });
         }
 
-        return sendResponse(405, { error: 'Method not allowed' });
+        return send(405, { error: 'Method not allowed' });
     } catch (error) {
-        console.log('Handler error:', error.message);
-        return sendResponse(500, { error: error.message });
+        console.log('Error:', error.message);
+        return send(500, { error: error.message });
     }
 };
