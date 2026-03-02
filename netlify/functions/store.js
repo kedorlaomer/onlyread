@@ -7,9 +7,8 @@ try {
         siteID: process.env.SITE_ID,
         token: process.env.BLOB_TOKEN
     });
-    console.log('Store init OK');
 } catch (err) {
-    console.log('Store init failed:', err.message);
+    store = null;
 }
 
 exports.handler = async (event, context) => {
@@ -49,7 +48,6 @@ exports.handler = async (event, context) => {
                 }
                 return send(200, data);
             } catch (e) {
-                console.log('Get error:', e.message);
                 if (e.message.includes('not exist') || e.message.includes('404')) {
                     return send(200, {});
                 }
@@ -70,7 +68,6 @@ exports.handler = async (event, context) => {
 
         return send(405, { error: 'Method not allowed' });
     } catch (error) {
-        console.log('Error:', error.message);
         return send(500, { error: error.message });
     }
 };

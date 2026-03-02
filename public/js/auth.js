@@ -16,7 +16,7 @@ const storageSetBtn = document.getElementById('storage-set-btn');
 const storageGetBtn = document.getElementById('storage-get-btn');
 const storageSyncBtn = document.getElementById('storage-sync-btn');
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }

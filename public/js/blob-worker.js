@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[BlobWorker]', ...args);
 }
@@ -14,49 +14,30 @@ function validateUUID(uuid) {
 }
 
 async function checkBlobAvailability() {
-    log('Checking blob availability...');
     try {
         const response = await fetch('/.netlify/functions/store');
         blobAvailable = response.ok;
-        log('Availability check response:', response.status, response.ok);
     } catch (e) {
         blobAvailable = false;
-        log('Availability check error:', e);
     }
-    log('Blob available via function:', blobAvailable);
 }
 
 async function syncFromBlob() {
-    log('syncFromBlob called, userId:', userId, 'blobAvailable:', blobAvailable);
-    if (!userId || !blobAvailable) {
-        log('syncFromBlob skipped');
-        return;
-    }
+    if (!userId || !blobAvailable) return;
 
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`);
-        if (response.status === 404) {
-            log('No existing blob data (first time user)');
-            return;
-        }
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (response.status === 404) return;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data && Object.keys(data).length > 0) {
             self.postMessage({ type: 'syncFromBlob', data });
-            log('Synced from blob:', Object.keys(data));
         }
-    } catch (e) {
-        log('Blob sync from failed, using local only:', e.message);
-    }
+    } catch (e) {}
 }
 
 async function syncToBlob(data) {
-    if (!userId || !blobAvailable) {
-        log('Blob not available, local-only mode');
-        return;
-    }
+    if (!userId || !blobAvailable) return;
 
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
@@ -64,14 +45,9 @@ async function syncToBlob(data) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        log('Synced to blob:', Object.keys(data));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         self.postMessage({ type: 'synced' });
-    } catch (e) {
-        log('Blob sync to failed, local-only mode:', e.message);
-    }
+    } catch (e) {}
 }
 
 function startSync() {
@@ -79,7 +55,6 @@ function startSync() {
     syncInterval = setInterval(() => {
         self.postMessage({ type: 'requestData' });
     }, 60000);
-    log('Started sync interval (local only if blob unavailable)');
 }
 
 function stopSync() {
@@ -97,7 +72,6 @@ self.onmessage = async function(e) {
             userId = payload.userId;
             siteId = payload.siteId;
             await checkBlobAvailability();
-            log('Worker initialized with userId:', userId, 'blobAvailable:', blobAvailable);
             await syncFromBlob();
             startSync();
             self.postMessage({ type: 'ready', blobAvailable });
