@@ -1,31 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hello World</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OnlyRead</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css">
     <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <style>
+        body {
+            padding: 2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .container {
+            text-align: center;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
-    <div id="login-page">
-        <h1>Please Log In</h1>
-        <button id="login-btn">Log In</button>
-    </div>
-
-    <div id="user-page" style="display: none;">
-        <h1>Welcome, <span id="user-name"></span>!</h1>
-        <h2>Your Token</h2>
-        <pre id="token-display"></pre>
-
-        <h2>Storage Test</h2>
-        <div>
-            <input type="text" id="storage-key" placeholder="Key">
-            <input type="text" id="storage-value" placeholder="Value (JSON)">
-            <button id="storage-set-btn">Set</button>
-            <button id="storage-get-btn">Get</button>
-            <button id="storage-sync-btn">Sync Now</button>
+    <div class="container">
+        <div id="login-page">
+            <h1>OnlyRead</h1>
+            <p>Please log in to continue.</p>
+            <button id="login-btn" class="pure-button pure-button-primary">Log In</button>
         </div>
-        <pre id="storage-result"></pre>
 
-        <button id="logout-btn">Log Out</button>
+        <div id="user-page" class="hidden">
+            <h1>Welcome, <span id="user-name"></span>!</h1>
+            <button id="logout-btn" class="pure-button pure-button-secondary">Log Out</button>
+        </div>
     </div>
 
     <script type="module" src="js/auth.js"></script>
