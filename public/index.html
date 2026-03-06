@@ -17,11 +17,30 @@
         .hidden {
             display: none !important;
         }
+        .feed-list {
+            text-align: left;
+            margin-top: 2rem;
+        }
+        .feed-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        .feed-form {
+            margin-top: 2rem;
+        }
+        .error {
+            color: red;
+            margin-top: 0.5rem;
+        }
+        .success {
+            color: green;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-            <img src="images/only_read.png" alt="OnlyRead Logo" style="max-width: 200px; margin-bottom: 1rem;">
+        <img src="images/only_read.png" alt="OnlyRead Logo" style="max-width: 200px; margin-bottom: 1rem;">
         
         <div id="login-page">
             <p>Please log in to continue.</p>
@@ -30,7 +49,22 @@
 
         <div id="user-page" class="hidden">
             <h1>Welcome, <span id="user-name"></span>!</h1>
-            <button id="logout-btn" class="pure-button pure-button-secondary">Log Out</button>
+            
+            <div class="feed-form">
+                <h3>Subscribe to RSS Feed</h3>
+                <form id="subscribe-form" class="pure-form">
+                    <input type="url" id="feed-url" placeholder="https://example.com/feed.xml" required>
+                    <button type="submit" class="pure-button pure-button-primary">Subscribe</button>
+                </form>
+                <div id="feed-message"></div>
+            </div>
+
+            <div class="feed-list">
+                <h3>Your Feeds</h3>
+                <div id="feeds-container"></div>
+            </div>
+
+            <button id="logout-btn" class="pure-button pure-button-secondary" style="margin-top: 2rem;">Log Out</button>
         </div>
     </div>
 
