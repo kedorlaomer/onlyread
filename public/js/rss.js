@@ -32,16 +32,13 @@ export async function subscribeToFeed(url, store) {
             return { success: false, error: 'Not an RSS feed' };
         }
 
-        const feeds = store.get('feeds') || { feeds: [] };
-        if (!feeds.feeds) {
-            feeds.feeds = [];
-        }
+        const feeds = store.get('feeds') || [];
 
-        if (feeds.feeds.some(f => f.url === url)) {
+        if (feeds.some(f => f.url === url)) {
             return { success: false, error: 'Feed already subscribed' };
         }
 
-        feeds.feeds.push({ url });
+        feeds.push({ url });
         store.set('feeds', feeds);
 
         return { success: true };
@@ -51,12 +48,11 @@ export async function subscribeToFeed(url, store) {
 }
 
 export function getFeeds(store) {
-    const data = store.get('feeds');
-    return data?.feeds || [];
+    return store.get('feeds') || [];
 }
 
 export function removeFeed(url, store) {
-    const feeds = store.get('feeds') || { feeds: [] };
-    feeds.feeds = feeds.feeds.filter(f => f.url !== url);
-    store.set('feeds', feeds);
+    const feeds = store.get('feeds') || [];
+    const filtered = feeds.filter(f => f.url !== url);
+    store.set('feeds', filtered);
 }
