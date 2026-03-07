@@ -88,6 +88,7 @@ function initFeedWorker(userId) {
         switch (type) {
             case 'getFeeds':
                 log('Worker requesting feeds');
+                log('blobStore.getAll():', blobStore.getAll());
                 const feeds = blobStore.getAll().feeds || [];
                 log('Sending feeds to worker:', feeds.length);
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
