@@ -139,6 +139,11 @@ export function createBlobStore() {
             return result;
         },
 
+        getAll() {
+            if (!currentUserId) return {};
+            return getAllData(currentUserId);
+        },
+
         async syncNow() {
             if (!currentUserId || !worker) return;
             const allData = getAllData(currentUserId);

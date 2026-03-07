@@ -168,3 +168,84 @@ export function exportFeedsAsText(store) {
     const feeds = getFeeds(store);
     return feeds.map(f => f.url).join('\n');
 }
+
+export async function fetchFeedItems(feedUrl) {
+    try {
+        const response = await fetch(feedUrl);
+        if (!response.ok) {
+            return [];
+        }
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(text, 'application/xml');
+        
+        const items = [];
+        
+        // Try RSS 2.0 format
+        const rssItems = xml.querySelectorAll('item');
+        if (rssItems.length > 0) {
+            for (const item of rssItems) {
+                const link = item.querySelector('link')?.textContent || '';
+                const pubDate = item.querySelector('pubDate')?.textContent || null;
+                const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
+                
+                if (link) {
+                    items.push({
+                        link,
+                        pubDate,
+                        enclosure,
+                        unread: true,
+                        addedDate: new Date().toISOString()
+                    });
+                }
+            }
+            return items;
+        }
+        
+        // Try Atom format
+        const atomEntries = xml.querySelectorAll('entry');
+        for (const entry of atomEntries) {
+            const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
+            const link = linkEl?.getAttribute('href') || '';
+            const pubDate = entry.querySelector('published')?.textContent || 
+                           entry.querySelector('updated')?.textContent || null;
+            const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
+            
+            if (link) {
+                items.push({
+                    link,
+                    pubDate,
+                    enclosure,
+                    unread: true,
+                    addedDate: new Date().toISOString()
+                });
+            }
+        }
+        
+        return items;
+    } catch (e) {
+        return [];
+    }
+}
+
+export function addItemsToFeed(feedUrl, newItems, store) {
+    const feeds = store.get('feeds');
+    if (!Array.isArray(feeds)) return;
+    
+    const feedIndex = feeds.findIndex(f => f.url === feedUrl);
+    if (feedIndex === -1) return;
+    
+    if (!feeds[feedIndex].items) {
+        feeds[feedIndex].items = [];
+    }
+    
+    const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
+    
+    for (const item of newItems) {
+        if (!existingLinks.has(item.link)) {
+            feeds[feedIndex].items.push(item);
+        }
+    }
+    
+    store.set('feeds', feeds);
+}

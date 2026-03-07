@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText } from './rss.js';
+import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -17,6 +17,7 @@ const exportOpmlBtn = document.getElementById('export-opml-btn');
 const exportTextBtn = document.getElementById('export-text-btn');
 
 let blobStore = null;
+let feedWorker = null;
 
 const DEBUG = false;
 function log(...args) {
@@ -57,18 +58,62 @@ function renderFeeds() {
         feedsContainer.innerHTML = '<p>No feeds subscribed yet.</p>';
         return;
     }
-    feedsContainer.innerHTML = feeds.map(feed => `
+    feedsContainer.innerHTML = feeds.map(feed => {
+        const itemCount = feed.items ? feed.items.length : 0;
+        const unreadCount = feed.items ? feed.items.filter(i => i.unread).length : 0;
+        return `
         <div class="feed-item">
-            <a href="${feed.url}" target="_blank">${feed.url}</a>
+            <span>${feed.url} (${unreadCount}/${itemCount})</span>
             <button class="pure-button pure-button-small" onclick="removeFeed('${feed.url}')">Remove</button>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 window.removeFeed = function(url) {
     removeFeed(url, blobStore);
     renderFeeds();
 };
+
+function initFeedWorker(userId) {
+    if (feedWorker) {
+        feedWorker.terminate();
+    }
+    
+    feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
+    
+    feedWorker.onmessage = (e) => {
+        const { type, payload } = e.data;
+        
+        switch (type) {
+            case 'getFeeds':
+                const feeds = blobStore.getAll().feeds || [];
+                feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
+                break;
+                
+            case 'updateFeed':
+                addItemsToFeed(payload.feedUrl, payload.items, blobStore);
+                renderFeeds();
+                break;
+                
+            case 'ready':
+                log('Feed worker ready');
+                break;
+        }
+    };
+    
+    feedWorker.postMessage({
+        type: 'init',
+        payload: { userId, store: blobStore }
+    });
+}
+
+function stopFeedWorker() {
+    if (feedWorker) {
+        feedWorker.postMessage({ type: 'stop' });
+        feedWorker.terminate();
+        feedWorker = null;
+    }
+}
 
 function updateUI() {
     const user = netlifyIdentity.currentUser();
@@ -90,6 +135,7 @@ loginBtn.addEventListener('click', () => {
 });
 
 logoutBtn.addEventListener('click', () => {
+    stopFeedWorker();
     netlifyIdentity.logout();
     updateUI();
 });
@@ -162,11 +208,13 @@ netlifyIdentity.on('login', async (user) => {
     if (jwtPayload?.sub) {
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
+        initFeedWorker(jwtPayload.sub);
     }
     updateUI();
 });
 
 netlifyIdentity.on('logout', () => {
+    stopFeedWorker();
     if (blobStore) {
         blobStore.destroy();
         blobStore = null;
