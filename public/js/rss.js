@@ -37,13 +37,15 @@ export async function subscribeToFeed(url, store) {
 
 async function validateFeed(url) {
     try {
-        const response = await fetch(url);
+        const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
         if (!response.ok) {
             return { valid: false, error: `HTTP ${response.status}` };
         }
 
-        const contentType = response.headers.get('content-type') || '';
-        const text = await response.text();
+        const data = await response.json();
+        const contentType = data.contentType || '';
+        const text = data.text;
 
         const isRss = contentType.includes('xml') || 
                       contentType.includes('rss') || 

@@ -3,11 +3,14 @@ let syncInterval = null;
 
 async function fetchFeedItems(feedUrl) {
     try {
-        const response = await fetch(feedUrl);
+        const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(feedUrl)}`;
+        const response = await fetch(proxyUrl);
         if (!response.ok) {
             return [];
         }
-        const text = await response.text();
+        const data = await response.json();
+        const text = data.text;
+        
         const parser = new DOMParser();
         const xml = parser.parseFromString(text, 'application/xml');
         
