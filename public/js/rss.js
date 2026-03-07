@@ -149,7 +149,7 @@ export function exportFeedsAsOpml(store) {
     <title>OnlyRead Feeds</title>
 </head>
 <body>
-${feeds.map(f => `    <outline text="${f.url}" type="rss" xmlUrl="${f.url}"/>`).join('\n')}
+${feeds.map(f => `    <outline type="rss" xmlUrl="${f.url}"/>`).join('\n')}
 </body>
 </opml>`;
     return opml;
