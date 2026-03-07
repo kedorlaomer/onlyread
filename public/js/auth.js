@@ -119,6 +119,12 @@ function stopFeedWorker() {
     }
 }
 
+function triggerFeedScan() {
+    if (feedWorker) {
+        feedWorker.postMessage({ type: 'scan' });
+    }
+}
+
 function updateUI() {
     const user = netlifyIdentity.currentUser();
     if (user) {
@@ -157,6 +163,7 @@ subscribeForm.addEventListener('submit', async (e) => {
         feedMessage.className = 'success';
         feedUrlInput.value = '';
         renderFeeds();
+        triggerFeedScan();
     } else {
         feedMessage.textContent = result.error;
         feedMessage.className = 'error';
@@ -184,6 +191,7 @@ importForm.addEventListener('submit', async (e) => {
         importMessage.className = 'success';
         importFileInput.value = '';
         renderFeeds();
+        triggerFeedScan();
     } else {
         importMessage.textContent = result.error;
         importMessage.className = 'error';

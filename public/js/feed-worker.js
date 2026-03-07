@@ -78,6 +78,7 @@ async function updateFeed(feedUrl) {
 }
 
 async function scanAllFeeds() {
+    log('Scanning all feeds...');
     self.postMessage({ type: 'getFeeds' });
 }
 
@@ -97,6 +98,11 @@ self.onmessage = async function(e) {
             startSync();
             await scanAllFeeds();
             self.postMessage({ type: 'ready' });
+            break;
+
+        case 'scan':
+            log('Manual scan triggered');
+            await scanAllFeeds();
             break;
 
         case 'feeds':
