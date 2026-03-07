@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[BlobStore]', ...args);
 }
@@ -141,8 +141,6 @@ export function createBlobStore() {
 
         getAll() {
             if (!currentUserId) return {};
-            log('getAll called, currentUserId:', currentUserId);
-            log('localStorage keys:', Array.from(localStorage));
             return getAllData(currentUserId);
         },
 

@@ -19,7 +19,7 @@ const exportTextBtn = document.getElementById('export-text-btn');
 let blobStore = null;
 let feedWorker = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -83,25 +83,19 @@ function initFeedWorker(userId) {
     
     feedWorker.onmessage = (e) => {
         const { type, payload } = e.data;
-        log('Received from worker:', type);
         
         switch (type) {
             case 'getFeeds':
-                log('Worker requesting feeds');
-                log('blobStore.getAll():', blobStore.getAll());
                 const feeds = blobStore.getAll().feeds || [];
-                log('Sending feeds to worker:', feeds.length);
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
                 break;
                 
             case 'updateFeed':
-                log('Updating feed:', payload.feedUrl, 'items:', payload.items.length);
                 addItemsToFeed(payload.feedUrl, payload.items, blobStore);
                 renderFeeds();
                 break;
                 
             case 'ready':
-                log('Feed worker ready');
                 break;
         }
     };

@@ -1,7 +1,7 @@
 let userId = null;
 let syncInterval = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[FeedWorker]', ...args);
 }
@@ -78,7 +78,6 @@ async function updateFeed(feedUrl) {
 }
 
 async function scanAllFeeds() {
-    log('Scanning all feeds...');
     self.postMessage({ type: 'getFeeds' });
 }
 
@@ -101,7 +100,6 @@ self.onmessage = async function(e) {
             break;
 
         case 'scan':
-            log('Manual scan triggered');
             await scanAllFeeds();
             break;
 
