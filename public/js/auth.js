@@ -16,7 +16,7 @@ const importMessage = document.getElementById('import-message');
 
 let blobStore = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -114,7 +114,6 @@ subscribeForm.addEventListener('submit', async (e) => {
 importForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const file = importFileInput.files[0];
-    log('Import submitted, file:', file?.name);
     if (!file) {
         importMessage.textContent = 'Please select a file';
         importMessage.className = 'error';
@@ -123,9 +122,7 @@ importForm.addEventListener('submit', async (e) => {
     importMessage.textContent = 'Importing...';
     importMessage.className = '';
     
-    log('Calling importFeeds...');
     const result = await importFeeds(file, blobStore);
-    log('Import result:', result);
     
     if (result.success) {
         importMessage.textContent = `Imported ${result.added} feeds, skipped ${result.skipped}`;
