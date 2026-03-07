@@ -141,6 +141,15 @@ export function removeFeed(url, store) {
     store.set('feeds', filtered);
 }
 
+function escapeXml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
 export function exportFeedsAsOpml(store) {
     const feeds = getFeeds(store);
     const opml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -149,7 +158,7 @@ export function exportFeedsAsOpml(store) {
     <title>OnlyRead Feeds</title>
 </head>
 <body>
-${feeds.map(f => `    <outline type="rss" xmlUrl="${f.url}"/>`).join('\n')}
+${feeds.map(f => `    <outline type="rss" xmlUrl="${escapeXml(f.url)}"/>`).join('\n')}
 </body>
 </opml>`;
     return opml;
