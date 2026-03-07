@@ -1,6 +1,11 @@
 let userId = null;
 let syncInterval = null;
 
+const DEBUG = true;
+function log(...args) {
+    if (DEBUG) console.log('[FeedWorker]', ...args);
+}
+
 async function fetchFeedItems(feedUrl) {
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(feedUrl)}`;
