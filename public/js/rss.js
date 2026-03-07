@@ -140,3 +140,22 @@ export function removeFeed(url, store) {
     const filtered = feeds.filter(f => f.url !== url);
     store.set('feeds', filtered);
 }
+
+export function exportFeedsAsOpml(store) {
+    const feeds = getFeeds(store);
+    const opml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+<head>
+    <title>OnlyRead Feeds</title>
+</head>
+<body>
+${feeds.map(f => `    <outline text="${f.url}" type="rss" xmlUrl="${f.url}"/>`).join('\n')}
+</body>
+</opml>`;
+    return opml;
+}
+
+export function exportFeedsAsText(store) {
+    const feeds = getFeeds(store);
+    return feeds.map(f => f.url).join('\n');
+}

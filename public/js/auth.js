@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed, importFeeds } from './rss.js';
+import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -13,6 +13,8 @@ const feedsContainer = document.getElementById('feeds-container');
 const importForm = document.getElementById('import-form');
 const importFileInput = document.getElementById('import-file');
 const importMessage = document.getElementById('import-message');
+const exportOpmlBtn = document.getElementById('export-opml-btn');
+const exportTextBtn = document.getElementById('export-text-btn');
 
 let blobStore = null;
 
@@ -133,6 +135,26 @@ importForm.addEventListener('submit', async (e) => {
         importMessage.textContent = result.error;
         importMessage.className = 'error';
     }
+});
+
+function downloadFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+exportOpmlBtn.addEventListener('click', () => {
+    const opml = exportFeedsAsOpml(blobStore);
+    downloadFile(opml, 'feeds.opml', 'application/xml');
+});
+
+exportTextBtn.addEventListener('click', () => {
+    const text = exportFeedsAsText(blobStore);
+    downloadFile(text, 'feeds.txt', 'text/plain');
 });
 
 netlifyIdentity.on('login', async (user) => {
