@@ -6,79 +6,18 @@ function log(...args) {
     if (DEBUG) console.log('[FeedWorker]', ...args);
 }
 
-async function fetchFeedItems(feedUrl) {
+async function fetchFeedText(feedUrl) {
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(feedUrl)}`;
         const response = await fetch(proxyUrl);
         if (!response.ok) {
-            return [];
+            return null;
         }
         const data = await response.json();
-        const text = data.text;
-        
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, 'application/xml');
-        
-        const items = [];
-        
-        const rssItems = xml.querySelectorAll('item');
-        if (rssItems.length > 0) {
-            for (const item of rssItems) {
-                const link = item.querySelector('link')?.textContent || '';
-                const pubDate = item.querySelector('pubDate')?.textContent || null;
-                const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
-                
-                if (link) {
-                    items.push({
-                        link,
-                        pubDate,
-                        enclosure,
-                        unread: true,
-                        addedDate: new Date().toISOString()
-                    });
-                }
-            }
-            return items;
-        }
-        
-        const atomEntries = xml.querySelectorAll('entry');
-        for (const entry of atomEntries) {
-            const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-            const link = linkEl?.getAttribute('href') || '';
-            const pubDate = entry.querySelector('published')?.textContent || 
-                           entry.querySelector('updated')?.textContent || null;
-            const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
-            
-            if (link) {
-                items.push({
-                    link,
-                    pubDate,
-                    enclosure,
-                    unread: true,
-                    addedDate: new Date().toISOString()
-                });
-            }
-        }
-        
-        return items;
+        return { feedUrl, text: data.text };
     } catch (e) {
-        return [];
+        return null;
     }
-}
-
-function getFeedsFromStore() {
-    self.postMessage({ type: 'getFeeds' });
-}
-
-async function updateFeed(feedUrl) {
-    const items = await fetchFeedItems(feedUrl);
-    if (items.length > 0) {
-        self.postMessage({ type: 'updateFeed', payload: { feedUrl, items } });
-    }
-}
-
-async function scanAllFeeds() {
-    self.postMessage({ type: 'getFeeds' });
 }
 
 function startSync() {
@@ -86,6 +25,10 @@ function startSync() {
     syncInterval = setInterval(() => {
         scanAllFeeds();
     }, 60 * 60 * 1000);
+}
+
+async function scanAllFeeds() {
+    self.postMessage({ type: 'getFeeds' });
 }
 
 self.onmessage = async function(e) {
@@ -105,7 +48,10 @@ self.onmessage = async function(e) {
 
         case 'feeds':
             for (const feed of payload.feeds) {
-                await updateFeed(feed.url);
+                const result = await fetchFeedText(feed.url);
+                if (result) {
+                    self.postMessage({ type: 'parseFeed', payload: result });
+                }
             }
             break;
 

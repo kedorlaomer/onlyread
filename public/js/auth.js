@@ -78,6 +78,53 @@ function initFeedWorker(userId) {
     if (feedWorker) {
         feedWorker.terminate();
     }
+function parseFeedItems(text) {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'application/xml');
+    
+    const items = [];
+    
+    const rssItems = xml.querySelectorAll('item');
+    if (rssItems.length > 0) {
+        for (const item of rssItems) {
+            const link = item.querySelector('link')?.textContent || '';
+            const pubDate = item.querySelector('pubDate')?.textContent || null;
+            const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
+            
+            if (link) {
+                items.push({
+                    link,
+                    pubDate,
+                    enclosure,
+                    unread: true,
+                    addedDate: new Date().toISOString()
+                });
+            }
+        }
+        return items;
+    }
+    
+    const atomEntries = xml.querySelectorAll('entry');
+    for (const entry of atomEntries) {
+        const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
+        const link = linkEl?.getAttribute('href') || '';
+        const pubDate = entry.querySelector('published')?.textContent || 
+                       entry.querySelector('updated')?.textContent || null;
+        const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
+        
+        if (link) {
+            items.push({
+                link,
+                pubDate,
+                enclosure,
+                unread: true,
+                addedDate: new Date().toISOString()
+            });
+        }
+    }
+    
+    return items;
+}
     
     feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
     
@@ -90,9 +137,12 @@ function initFeedWorker(userId) {
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
                 break;
                 
-            case 'updateFeed':
-                addItemsToFeed(payload.feedUrl, payload.items, blobStore);
-                renderFeeds();
+            case 'parseFeed':
+                const items = parseFeedItems(payload.text);
+                if (items.length > 0) {
+                    addItemsToFeed(payload.feedUrl, items, blobStore);
+                    renderFeeds();
+                }
                 break;
                 
             case 'ready':
