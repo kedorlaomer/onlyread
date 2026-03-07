@@ -95,7 +95,10 @@ export async function importFeeds(file, store) {
                 return;
             }
 
-            const feeds = store.get('feeds') || [];
+        const feeds = store.get('feeds');
+        if (!Array.isArray(feeds)) {
+            return { success: false, error: 'Invalid feeds data' };
+        }
             let added = 0;
             let skipped = 0;
 
@@ -119,11 +122,18 @@ export async function importFeeds(file, store) {
 }
 
 export function getFeeds(store) {
-    return store.get('feeds') || [];
+    const data = store.get('feeds');
+    if (Array.isArray(data)) {
+        return data;
+    }
+    return [];
 }
 
 export function removeFeed(url, store) {
-    const feeds = store.get('feeds') || [];
+    const feeds = store.get('feeds');
+    if (!Array.isArray(feeds)) {
+        return;
+    }
     const filtered = feeds.filter(f => f.url !== url);
     store.set('feeds', filtered);
 }
