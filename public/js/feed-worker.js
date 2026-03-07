@@ -1,5 +1,4 @@
 let userId = null;
-let store = null;
 let syncInterval = null;
 
 async function fetchFeedItems(feedUrl) {
@@ -87,7 +86,6 @@ self.onmessage = async function(e) {
     switch (type) {
         case 'init':
             userId = payload.userId;
-            store = payload.store;
             startSync();
             await scanAllFeeds();
             self.postMessage({ type: 'ready' });

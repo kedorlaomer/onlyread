@@ -103,7 +103,7 @@ function initFeedWorker(userId) {
     
     feedWorker.postMessage({
         type: 'init',
-        payload: { userId, store: blobStore }
+        payload: { userId }
     });
 }
 
