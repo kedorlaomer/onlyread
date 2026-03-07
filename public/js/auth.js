@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed } from './rss.js';
+import { subscribeToFeed, getFeeds, removeFeed, importFeeds } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -10,6 +10,9 @@ const subscribeForm = document.getElementById('subscribe-form');
 const feedUrlInput = document.getElementById('feed-url');
 const feedMessage = document.getElementById('feed-message');
 const feedsContainer = document.getElementById('feeds-container');
+const importForm = document.getElementById('import-form');
+const importFileInput = document.getElementById('import-file');
+const importMessage = document.getElementById('import-message');
 
 let blobStore = null;
 
@@ -100,6 +103,30 @@ subscribeForm.addEventListener('submit', async (e) => {
     } else {
         feedMessage.textContent = result.error;
         feedMessage.className = 'error';
+    }
+});
+
+importForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = importFileInput.files[0];
+    if (!file) {
+        importMessage.textContent = 'Please select a file';
+        importMessage.className = 'error';
+        return;
+    }
+    importMessage.textContent = 'Importing...';
+    importMessage.className = '';
+    
+    const result = await importFeeds(file, blobStore);
+    
+    if (result.success) {
+        importMessage.textContent = `Imported ${result.added} feeds, skipped ${result.skipped}`;
+        importMessage.className = 'success';
+        importFileInput.value = '';
+        renderFeeds();
+    } else {
+        importMessage.textContent = result.error;
+        importMessage.className = 'error';
     }
 });
 

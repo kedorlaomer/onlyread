@@ -47,6 +47,77 @@ export async function subscribeToFeed(url, store) {
     }
 }
 
+function extractUrlsFromOpml(text) {
+    const urls = [];
+    const regex = /https?:\/\/[^\s<>"']+/gi;
+    const matches = text.match(regex);
+    if (matches) {
+        for (const url of matches) {
+            const cleaned = url.replace(/[^\x20-\x7E]/g, '').trim();
+            if (validateUrl(cleaned)) {
+                urls.push(cleaned);
+            }
+        }
+    }
+    return urls;
+}
+
+function extractUrlsFromText(text) {
+    const urls = [];
+    const lines = text.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed && validateUrl(trimmed)) {
+            urls.push(trimmed);
+        }
+    }
+    return urls;
+}
+
+export async function importFeeds(file, store) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target.result;
+            let urls = [];
+
+            if (file.name.toLowerCase().endsWith('.opml') || 
+                file.name.toLowerCase().endsWith('.xml') ||
+                text.includes('<opml') ||
+                text.includes('<outline')) {
+                urls = extractUrlsFromOpml(text);
+            } else {
+                urls = extractUrlsFromText(text);
+            }
+
+            if (urls.length === 0) {
+                resolve({ success: false, error: 'No valid URLs found' });
+                return;
+            }
+
+            const feeds = store.get('feeds') || [];
+            let added = 0;
+            let skipped = 0;
+
+            for (const url of urls) {
+                if (feeds.some(f => f.url === url)) {
+                    skipped++;
+                } else {
+                    feeds.push({ url });
+                    added++;
+                }
+            }
+
+            store.set('feeds', feeds);
+            resolve({ success: true, added, skipped });
+        };
+        reader.onerror = () => {
+            resolve({ success: false, error: 'Failed to read file' });
+        };
+        reader.readAsText(file);
+    });
+}
+
 export function getFeeds(store) {
     return store.get('feeds') || [];
 }
