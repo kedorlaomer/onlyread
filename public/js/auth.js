@@ -170,10 +170,13 @@ importForm.addEventListener('submit', async (e) => {
     importMessage.textContent = 'Importing...';
     importMessage.className = '';
     
-    const result = await importFeeds(file, blobStore);
+    const result = await importFeeds(file, blobStore, true);
     
     if (result.success) {
-        importMessage.textContent = `Imported ${result.added} feeds, skipped ${result.skipped}`;
+        let msg = `Imported ${result.added} feeds`;
+        if (result.skipped > 0) msg += `, skipped ${result.skipped}`;
+        if (result.invalid > 0) msg += `, invalid ${result.invalid}`;
+        importMessage.textContent = msg;
         importMessage.className = 'success';
         importFileInput.value = '';
         renderFeeds();

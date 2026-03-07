@@ -17,10 +17,29 @@ export async function subscribeToFeed(url, store) {
         return { success: false, error: 'Invalid URL' };
     }
 
+    const validation = await validateFeed(url);
+    if (!validation.valid) {
+        return { success: false, error: validation.error };
+    }
+
+    const feeds = store.get('feeds');
+    const currentFeeds = Array.isArray(feeds) ? feeds : [];
+
+    if (currentFeeds.some(f => f.url === url)) {
+        return { success: false, error: 'Feed already subscribed' };
+    }
+
+    currentFeeds.push({ url });
+    store.set('feeds', currentFeeds);
+
+    return { success: true };
+}
+
+async function validateFeed(url) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            return { success: false, error: `HTTP ${response.status}` };
+            return { valid: false, error: `HTTP ${response.status}` };
         }
 
         const contentType = response.headers.get('content-type') || '';
@@ -34,21 +53,12 @@ export async function subscribeToFeed(url, store) {
                       text.trim().startsWith('<feed');
 
         if (!isRss) {
-            return { success: false, error: 'Not an RSS feed' };
+            return { valid: false, error: 'Not an RSS feed' };
         }
 
-        const feeds = store.get('feeds') || [];
-
-        if (feeds.some(f => f.url === url)) {
-            return { success: false, error: 'Feed already subscribed' };
-        }
-
-        feeds.push({ url });
-        store.set('feeds', feeds);
-
-        return { success: true };
+        return { valid: true };
     } catch (error) {
-        return { success: false, error: error.message };
+        return { valid: false, error: error.message };
     }
 }
 
@@ -79,7 +89,7 @@ function extractUrlsFromText(text) {
     return urls;
 }
 
-export async function importFeeds(file, store) {
+export async function importFeeds(file, store, validate = true) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -104,10 +114,19 @@ export async function importFeeds(file, store) {
             const currentFeeds = Array.isArray(feeds) ? feeds : [];
             let added = 0;
             let skipped = 0;
+            let invalid = 0;
 
             for (const url of urls) {
                 if (currentFeeds.some(f => f.url === url)) {
                     skipped++;
+                } else if (validate) {
+                    const validation = await validateFeed(url);
+                    if (validation.valid) {
+                        currentFeeds.push({ url });
+                        added++;
+                    } else {
+                        invalid++;
+                    }
                 } else {
                     currentFeeds.push({ url });
                     added++;
@@ -115,7 +134,7 @@ export async function importFeeds(file, store) {
             }
 
             store.set('feeds', currentFeeds);
-            resolve({ success: true, added, skipped });
+            resolve({ success: true, added, skipped, invalid });
         };
         reader.onerror = () => {
             resolve({ success: false, error: 'Failed to read file' });
