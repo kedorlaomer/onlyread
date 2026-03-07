@@ -1,3 +1,8 @@
+const DEBUG = true;
+function log(...args) {
+    if (DEBUG) console.log('[RSS]', ...args);
+}
+
 export function validateUrl(string) {
     try {
         const url = new URL(string);
@@ -75,43 +80,55 @@ function extractUrlsFromText(text) {
 }
 
 export async function importFeeds(file, store) {
+    log('Starting import, file:', file.name);
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
+            log('File read complete');
             const text = e.target.result;
+            log('File content length:', text.length);
             let urls = [];
 
             if (file.name.toLowerCase().endsWith('.opml') || 
                 file.name.toLowerCase().endsWith('.xml') ||
                 text.includes('<opml') ||
                 text.includes('<outline')) {
+                log('Detected OPML file');
                 urls = extractUrlsFromOpml(text);
             } else {
+                log('Detected plain text file');
                 urls = extractUrlsFromText(text);
             }
 
+            log('Extracted URLs:', urls.length);
+
             if (urls.length === 0) {
+                log('No valid URLs found');
                 resolve({ success: false, error: 'No valid URLs found' });
                 return;
             }
 
-        const feeds = store.get('feeds');
-        if (!Array.isArray(feeds)) {
-            return { success: false, error: 'Invalid feeds data' };
-        }
+            const feeds = store.get('feeds');
+            log('Current feeds:', feeds);
+            if (!Array.isArray(feeds)) {
+                log('Invalid feeds data, initializing empty array');
+            }
+            const currentFeeds = Array.isArray(feeds) ? feeds : [];
             let added = 0;
             let skipped = 0;
 
             for (const url of urls) {
-                if (feeds.some(f => f.url === url)) {
+                if (currentFeeds.some(f => f.url === url)) {
                     skipped++;
                 } else {
-                    feeds.push({ url });
+                    currentFeeds.push({ url });
                     added++;
                 }
             }
 
-            store.set('feeds', feeds);
+            log('Adding', added, 'feeds, skipping', skipped);
+            store.set('feeds', currentFeeds);
+            log('Feeds saved');
             resolve({ success: true, added, skipped });
         };
         reader.onerror = () => {
