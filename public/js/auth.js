@@ -74,10 +74,16 @@ window.removeFeed = function(url) {
     renderFeeds();
 };
 
-function initFeedWorker(userId) {
-    if (feedWorker) {
-        feedWorker.terminate();
-    }
+function unescapeXml(text) {
+    if (!text) return null;
+    return text
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+}
+
 function parseFeedItems(text) {
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'application/xml');
@@ -90,12 +96,15 @@ function parseFeedItems(text) {
             const link = item.querySelector('link')?.textContent || '';
             const pubDate = item.querySelector('pubDate')?.textContent || null;
             const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
+            const descriptionEl = item.querySelector('description');
+            const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
             
             if (link) {
                 items.push({
                     link,
                     pubDate,
                     enclosure,
+                    description,
                     unread: true,
                     addedDate: new Date().toISOString()
                 });
@@ -111,12 +120,15 @@ function parseFeedItems(text) {
         const pubDate = entry.querySelector('published')?.textContent || 
                        entry.querySelector('updated')?.textContent || null;
         const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
+        const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
+        const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
         
         if (link) {
             items.push({
                 link,
                 pubDate,
                 enclosure,
+                description,
                 unread: true,
                 addedDate: new Date().toISOString()
             });
@@ -125,6 +137,11 @@ function parseFeedItems(text) {
     
     return items;
 }
+
+function initFeedWorker(userId) {
+    if (feedWorker) {
+        feedWorker.terminate();
+    }
     
     feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
     
