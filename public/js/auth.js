@@ -99,7 +99,8 @@ function parseFeedItems(text) {
     // Get feed metadata
     const channel = xml.querySelector('channel');
     const feedTitle = channel?.querySelector('title')?.textContent || null;
-    const feedLink = channel?.querySelector('link')?.textContent || null;
+    const feedLinkEl = channel?.querySelector('link');
+    const feedLink = feedLinkEl?.textContent || feedLinkEl?.getAttribute('href') || null;
     
     const rssItems = xml.querySelectorAll('item');
     if (rssItems.length > 0) {
