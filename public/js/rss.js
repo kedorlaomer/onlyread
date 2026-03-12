@@ -270,3 +270,16 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     
     store.set('feeds', feeds);
 }
+
+export function updateFeedMeta(feedUrl, title, link, store) {
+    const feeds = store.get('feeds');
+    if (!Array.isArray(feeds)) return;
+    
+    const feedIndex = feeds.findIndex(f => f.url === feedUrl);
+    if (feedIndex === -1) return;
+    
+    if (title) feeds[feedIndex].title = title;
+    if (link) feeds[feedIndex].link = link;
+    
+    store.set('feeds', feeds);
+}

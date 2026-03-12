@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed } from './rss.js';
+import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -58,12 +58,21 @@ function renderFeeds() {
         feedsContainer.innerHTML = '<p>No feeds subscribed yet.</p>';
         return;
     }
-    feedsContainer.innerHTML = feeds.map(feed => `
+    feedsContainer.innerHTML = feeds.map(feed => {
+        let displayHtml = '';
+        if (feed.title && feed.link) {
+            displayHtml = `<a href="${feed.link}" target="_blank">${feed.title}</a> <span style="margin-left: 8px; opacity: 0.6;">(<a href="${feed.url}" target="_blank">RSS</a>)</span>`;
+        } else if (feed.title) {
+            displayHtml = `${feed.title} <span style="margin-left: 8px; opacity: 0.6;">(<a href="${feed.url}" target="_blank">RSS</a>)</span>`;
+        } else {
+            displayHtml = `<a href="${feed.url}" target="_blank">${feed.url}</a>`;
+        }
+        return `
         <div class="feed-item">
-            <span>${feed.url}</span>
+            <span>${displayHtml}</span>
             <button class="pure-button pure-button-small" onclick="removeFeed('${feed.url}')">Remove</button>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 window.removeFeed = function(url) {
@@ -87,6 +96,11 @@ function parseFeedItems(text) {
     
     const items = [];
     
+    // Get feed metadata
+    const channel = xml.querySelector('channel');
+    const feedTitle = channel?.querySelector('title')?.textContent || null;
+    const feedLink = channel?.querySelector('link')?.textContent || null;
+    
     const rssItems = xml.querySelectorAll('item');
     if (rssItems.length > 0) {
         for (const item of rssItems) {
@@ -107,8 +121,14 @@ function parseFeedItems(text) {
                 });
             }
         }
-        return items;
+        return { items, title: feedTitle, link: feedLink };
     }
+    
+    // Atom format
+    const atomFeed = xml.querySelector('feed');
+    const atomTitle = atomFeed?.querySelector('title')?.textContent || feedTitle;
+    const atomLinkEl = atomFeed?.querySelector('link[rel="alternate"]') || atomFeed?.querySelector('link');
+    const atomLink = atomLinkEl?.getAttribute('href') || feedLink;
     
     const atomEntries = xml.querySelectorAll('entry');
     for (const entry of atomEntries) {
@@ -132,7 +152,7 @@ function parseFeedItems(text) {
         }
     }
     
-    return items;
+    return { items, title: atomTitle, link: atomLink };
 }
 
 function initFeedWorker(userId) {
@@ -152,9 +172,12 @@ function initFeedWorker(userId) {
                 break;
                 
             case 'parseFeed':
-                const items = parseFeedItems(payload.text);
-                if (items.length > 0) {
-                    addItemsToFeed(payload.feedUrl, items, blobStore);
+                const result = parseFeedItems(payload.text);
+                if (result.items.length > 0) {
+                    addItemsToFeed(payload.feedUrl, result.items, blobStore);
+                    if (result.title || result.link) {
+                        updateFeedMeta(payload.feedUrl, result.title, result.link, blobStore);
+                    }
                     renderFeeds();
                 }
                 break;
