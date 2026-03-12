@@ -19,7 +19,7 @@ const exportTextBtn = document.getElementById('export-text-btn');
 let blobStore = null;
 let feedWorker = null;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }

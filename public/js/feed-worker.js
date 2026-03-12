@@ -1,7 +1,7 @@
 let userId = null;
 let syncInterval = null;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[FeedWorker]', ...args);
 }
