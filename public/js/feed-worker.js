@@ -7,15 +7,18 @@ function log(...args) {
 }
 
 async function fetchFeedText(feedUrl) {
+    log('Fetching feed:', feedUrl);
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(feedUrl)}`;
         const response = await fetch(proxyUrl);
+        log('Fetch response:', response.status);
         if (!response.ok) {
             return null;
         }
         const data = await response.json();
         return { feedUrl, text: data.text };
     } catch (e) {
+        log('Fetch error:', e);
         return null;
     }
 }
@@ -33,6 +36,7 @@ async function scanAllFeeds() {
 
 self.onmessage = async function(e) {
     const { type, payload } = e.data;
+    log('Received message:', type);
 
     switch (type) {
         case 'init':
@@ -47,6 +51,7 @@ self.onmessage = async function(e) {
             break;
 
         case 'feeds':
+            log('Processing feeds:', payload.feeds.length);
             for (const feed of payload.feeds) {
                 const result = await fetchFeedText(feed.url);
                 if (result) {

@@ -160,19 +160,25 @@ function initFeedWorker(userId) {
         feedWorker.terminate();
     }
     
+    console.log('[Auth] Initializing feed worker...');
     feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
     
     feedWorker.onmessage = (e) => {
         const { type, payload } = e.data;
+        console.log('[Auth] Worker message:', type);
         
         switch (type) {
             case 'getFeeds':
+                console.log('[Auth] Worker requesting feeds');
                 const feeds = blobStore.getAll().feeds || [];
+                console.log('[Auth] Sending feeds to worker:', feeds.length);
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
                 break;
                 
             case 'parseFeed':
+                console.log('[Auth] Parsing feed:', payload.feedUrl);
                 const result = parseFeedItems(payload.text);
+                console.log('[Auth] Parse result:', result);
                 if (result.items.length > 0) {
                     addItemsToFeed(payload.feedUrl, result.items, blobStore);
                     if (result.title || result.link) {
@@ -183,6 +189,7 @@ function initFeedWorker(userId) {
                 break;
                 
             case 'ready':
+                console.log('[Auth] Worker ready');
                 break;
         }
     };
