@@ -58,15 +58,12 @@ function renderFeeds() {
         feedsContainer.innerHTML = '<p>No feeds subscribed yet.</p>';
         return;
     }
-    feedsContainer.innerHTML = feeds.map(feed => {
-        const itemCount = feed.items ? feed.items.length : 0;
-        const unreadCount = feed.items ? feed.items.filter(i => i.unread).length : 0;
-        return `
+    feedsContainer.innerHTML = feeds.map(feed => `
         <div class="feed-item">
-            <span>${feed.url} (${unreadCount}/${itemCount})</span>
+            <span>${feed.url}</span>
             <button class="pure-button pure-button-small" onclick="removeFeed('${feed.url}')">Remove</button>
         </div>
-    `}).join('');
+    `).join('');
 }
 
 window.removeFeed = function(url) {
