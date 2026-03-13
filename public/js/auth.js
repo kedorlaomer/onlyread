@@ -16,13 +16,41 @@ const importMessage = document.getElementById('import-message');
 const exportOpmlBtn = document.getElementById('export-opml-btn');
 const exportTextBtn = document.getElementById('export-text-btn');
 
+const navRead = document.getElementById('nav-read');
+const navManage = document.getElementById('nav-manage');
+const navLogout = document.getElementById('nav-logout');
+const pageRead = document.getElementById('page-read');
+const pageManage = document.getElementById('page-manage');
+
 let blobStore = null;
 let feedWorker = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
+
+function showPage(pageName) {
+    navRead.classList.remove('active');
+    navManage.classList.remove('active');
+    pageRead.classList.add('hidden');
+    pageManage.classList.add('hidden');
+    
+    if (pageName === 'read') {
+        navRead.classList.add('active');
+        pageRead.classList.remove('hidden');
+    } else if (pageName === 'manage') {
+        navManage.classList.add('active');
+        pageManage.classList.remove('hidden');
+    }
+}
+
+navRead.addEventListener('click', () => showPage('read'));
+navManage.addEventListener('click', () => showPage('manage'));
+navLogout.addEventListener('click', () => {
+    stopFeedWorker();
+    netlifyIdentity.logout();
+});
 
 function decodeJWT(token) {
     if (typeof token !== 'string') {
@@ -166,20 +194,15 @@ function initFeedWorker(userId) {
     
     feedWorker.onmessage = (e) => {
         const { type, payload } = e.data;
-        console.log('[Auth] Worker message:', type);
         
         switch (type) {
             case 'getFeeds':
-                console.log('[Auth] Worker requesting feeds');
                 const feeds = blobStore.getAll().feeds || [];
-                console.log('[Auth] Sending feeds to worker:', feeds.length);
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
                 break;
                 
             case 'parseFeed':
-                console.log('[Auth] Parsing feed:', payload.feedUrl);
                 const result = parseFeedItems(payload.text);
-                console.log('[Auth] Parse result:', result);
                 if (result.items.length > 0) {
                     addItemsToFeed(payload.feedUrl, result.items, blobStore);
                     if (result.title || result.link) {
@@ -187,10 +210,6 @@ function initFeedWorker(userId) {
                     }
                     renderFeeds();
                 }
-                break;
-                
-            case 'ready':
-                console.log('[Auth] Worker ready');
                 break;
         }
     };
@@ -221,6 +240,7 @@ function updateUI() {
         loginPage.classList.add('hidden');
         userPage.classList.remove('hidden');
         userNameDisplay.textContent = getUserName(user);
+        showPage('manage');
         if (blobStore) {
             renderFeeds();
         }
