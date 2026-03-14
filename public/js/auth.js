@@ -202,19 +202,20 @@ function renderItems() {
         if (item.description) {
             const cleanText = stripHtml(item.description);
             const words = cleanText.split(/\s+/);
-            const titleWords = words.slice(0, 15).join(' ');
             
             if (item.title) {
-                // Has title: show feed: title
-                titleHtml = `${item.title}`;
-                if (words.length > 15) {
-                    contentHtml = words.slice(15, 100).join(' ') + '...';
+                // Has title: show title, then content
+                titleHtml = item.title;
+                if (words.length > 0) {
+                    contentHtml = words.slice(0, 100).join(' ');
+                    if (words.length > 100) contentHtml += '...';
                 }
             } else {
-                // No title: show first words as title, then ...
-                titleHtml = `${titleWords}...`;
+                // No title: show first words as title, then rest as content
+                titleHtml = words.slice(0, 15).join(' ') + '...';
                 if (words.length > 15) {
                     contentHtml = '...' + words.slice(15, 100).join(' ');
+                    if (words.length > 100) contentHtml += '...';
                 }
             }
         } else {
