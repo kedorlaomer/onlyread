@@ -323,10 +323,7 @@ function updateUI() {
         loginPage.classList.add('hidden');
         userPage.classList.remove('hidden');
         userNameDisplay.textContent = getUserName(user);
-        showPage('manage');
-        if (blobStore) {
-            renderFeeds();
-        }
+        showPage('read');
     } else {
         loginPage.classList.remove('hidden');
         userPage.classList.add('hidden');
