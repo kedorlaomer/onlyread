@@ -187,8 +187,15 @@ function renderItems() {
         return;
     }
     
+    function formatDate(dateStr) {
+        const date = parseRfc822Date(dateStr);
+        if (!date) return '';
+        return date.toLocaleString();
+    }
+    
     itemsContainer.innerHTML = '<div class="item-list">' + allItems.map(item => {
         const feedTitle = item.feedTitle;
+        const dateStr = formatDate(item.pubDate);
         let titleHtml = '';
         let contentHtml = '';
         
@@ -199,7 +206,7 @@ function renderItems() {
             
             if (item.title) {
                 // Has title: show feed: title
-                titleHtml = `${feedTitle}: ${item.title}`;
+                titleHtml = `${item.title}`;
                 if (words.length > 15) {
                     contentHtml = words.slice(15, 100).join(' ') + '...';
                 }
@@ -216,6 +223,10 @@ function renderItems() {
         
         return `
             <div class="item">
+                <div class="item-meta">
+                    <span class="item-date">${dateStr}</span>
+                    <span class="item-feed">(${feedTitle})</span>
+                </div>
                 <div class="item-title">
                     <a href="${item.link}" target="_blank">${titleHtml}</a>
                 </div>
