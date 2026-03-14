@@ -49,6 +49,8 @@ navManage.addEventListener('click', () => showPage('manage'));
 navLogout.addEventListener('click', () => {
     stopFeedWorker();
     netlifyIdentity.logout();
+    loginPage.classList.remove('hidden');
+    userPage.classList.add('hidden');
 });
 
 function decodeJWT(token) {
