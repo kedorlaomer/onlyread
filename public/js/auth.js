@@ -131,15 +131,15 @@ function truncateWords(text, wordCount) {
 function stripHtml(html) {
     if (!html) return '';
     
-    // Keep only b, i, u, a tags and their content
+    // Keep only b, i, u, a, em, strong tags and their content
     let result = html;
     
     // Replace <br> and </p> with newlines
     result = result.replace(/<br\s*\/?>/gi, '\n');
     result = result.replace(/<\/p>/gi, '\n\n');
     
-    // Remove all tags except b, i, u, a
-    result = result.replace(/<\/?(?!(b|i|u|a |b>|i>|u>|a |b>|i>|u>|a>))[a-z][a-z0-9]*[^>]*>/gi, '');
+    // Remove all tags except b, i, u, a, em, strong
+    result = result.replace(/<\/?(?!(b|i|u|a|em|strong)\b)[a-z][a-z0-9]*[^>]*>/gi, '');
     
     // Decode common HTML entities
     result = result.replace(/&nbsp;/gi, ' ');
