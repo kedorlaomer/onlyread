@@ -4,7 +4,6 @@ import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
 const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
 const userNameDisplay = document.getElementById('user-name');
 const subscribeForm = document.getElementById('subscribe-form');
 const feedUrlInput = document.getElementById('feed-url');
@@ -25,7 +24,7 @@ const pageManage = document.getElementById('page-manage');
 let blobStore = null;
 let feedWorker = null;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -252,12 +251,6 @@ function updateUI() {
 
 loginBtn.addEventListener('click', () => {
     netlifyIdentity.open();
-});
-
-logoutBtn.addEventListener('click', () => {
-    stopFeedWorker();
-    netlifyIdentity.logout();
-    updateUI();
 });
 
 subscribeForm.addEventListener('submit', async (e) => {
