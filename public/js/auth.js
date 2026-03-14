@@ -195,18 +195,23 @@ function renderItems() {
         if (item.description) {
             const cleanText = stripHtml(item.description);
             const words = cleanText.split(/\s+/);
-            if (words.length > 100) {
-                const titleWords = words.slice(0, 15).join(' ');
-                const contentWords = words.slice(15, 100).join(' ');
-                titleHtml = `${feedTitle}: ${titleWords}`;
-                contentHtml = contentWords + '...';
+            const titleWords = words.slice(0, 15).join(' ');
+            
+            if (item.title) {
+                // Has title: show feed: title
+                titleHtml = `${feedTitle}: ${item.title}`;
+                if (words.length > 15) {
+                    contentHtml = words.slice(15, 100).join(' ') + '...';
+                }
             } else {
-                titleHtml = `${feedTitle}: ${truncateWords(cleanText, 100)}`;
-                contentHtml = '';
+                // No title: show first words as title, then ...
+                titleHtml = `${titleWords}...`;
+                if (words.length > 15) {
+                    contentHtml = '...' + words.slice(15, 100).join(' ');
+                }
             }
         } else {
             titleHtml = feedTitle;
-            contentHtml = '';
         }
         
         return `
@@ -246,6 +251,7 @@ function parseFeedItems(text) {
     if (rssItems.length > 0) {
         for (const item of rssItems) {
             const link = item.querySelector('link')?.textContent || '';
+            const title = item.querySelector('title')?.textContent || null;
             const pubDate = item.querySelector('pubDate')?.textContent || null;
             const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
             const descriptionEl = item.querySelector('description');
@@ -254,6 +260,7 @@ function parseFeedItems(text) {
             if (link) {
                 items.push({
                     link,
+                    title,
                     pubDate,
                     enclosure,
                     description,
@@ -277,6 +284,7 @@ function parseFeedItems(text) {
         const link = linkEl?.getAttribute('href') || '';
         const pubDate = entry.querySelector('published')?.textContent || 
                        entry.querySelector('updated')?.textContent || null;
+        const title = entry.querySelector('title')?.textContent || null;
         const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
         const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
         const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
@@ -284,6 +292,7 @@ function parseFeedItems(text) {
         if (link) {
             items.push({
                 link,
+                title,
                 pubDate,
                 enclosure,
                 description,
