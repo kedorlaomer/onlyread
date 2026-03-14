@@ -128,6 +128,34 @@ function truncateWords(text, wordCount) {
     return words.slice(0, wordCount).join(' ') + '...';
 }
 
+function stripHtml(html) {
+    if (!html) return '';
+    
+    // Keep only b, i, u, a tags and their content
+    let result = html;
+    
+    // Replace <br> and </p> with newlines
+    result = result.replace(/<br\s*\/?>/gi, '\n');
+    result = result.replace(/<\/p>/gi, '\n\n');
+    
+    // Remove all tags except b, i, u, a
+    result = result.replace(/<\/?(?!(b|i|u|a |b>|i>|u>|a |b>|i>|u>|a>))[a-z][a-z0-9]*[^>]*>/gi, '');
+    
+    // Decode common HTML entities
+    result = result.replace(/&nbsp;/gi, ' ');
+    result = result.replace(/&amp;/gi, '&');
+    result = result.replace(/&lt;/gi, '<');
+    result = result.replace(/&gt;/gi, '>');
+    result = result.replace(/&quot;/gi, '"');
+    
+    // Clean up whitespace
+    result = result.replace(/\n\s*\n/g, '\n\n');
+    result = result.replace(/[ \t]+/g, ' ');
+    result = result.trim();
+    
+    return result;
+}
+
 function renderItems() {
     if (!blobStore) return;
     const feeds = getFeeds(blobStore);
@@ -165,14 +193,15 @@ function renderItems() {
         let contentHtml = '';
         
         if (item.description) {
-            const words = item.description.split(/\s+/);
+            const cleanText = stripHtml(item.description);
+            const words = cleanText.split(/\s+/);
             if (words.length > 100) {
                 const titleWords = words.slice(0, 15).join(' ');
                 const contentWords = words.slice(15, 100).join(' ');
                 titleHtml = `${feedTitle}: ${titleWords}`;
                 contentHtml = contentWords + '...';
             } else {
-                titleHtml = `${feedTitle}: ${truncateWords(item.description, 100)}`;
+                titleHtml = `${feedTitle}: ${truncateWords(cleanText, 100)}`;
                 contentHtml = '';
             }
         } else {
