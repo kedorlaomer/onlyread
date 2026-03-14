@@ -128,13 +128,6 @@ function truncateWords(text, wordCount) {
     return words.slice(0, wordCount).join(' ') + '...';
 }
 
-function truncateLines(text, lineCount) {
-    if (!text) return '';
-    const lines = text.split('\n');
-    if (lines.length <= lineCount) return text;
-    return lines.slice(0, lineCount).join('\n') + '...';
-}
-
 function renderItems() {
     if (!blobStore) return;
     const feeds = getFeeds(blobStore);
@@ -173,14 +166,14 @@ function renderItems() {
         
         if (item.description) {
             const words = item.description.split(/\s+/);
-            if (words.length > 20) {
+            if (words.length > 100) {
                 const titleWords = words.slice(0, 15).join(' ');
-                const contentRest = words.slice(15).join(' ');
+                const contentWords = words.slice(15, 100).join(' ');
                 titleHtml = `${feedTitle}: ${titleWords}`;
-                contentHtml = truncateLines(contentRest, 4);
+                contentHtml = contentWords + '...';
             } else {
-                titleHtml = `${feedTitle}: ${item.description.slice(0, 100)}`;
-                contentHtml = truncateLines(item.description, 4);
+                titleHtml = `${feedTitle}: ${truncateWords(item.description, 100)}`;
+                contentHtml = '';
             }
         } else {
             titleHtml = feedTitle;
