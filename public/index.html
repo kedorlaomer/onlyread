@@ -40,6 +40,33 @@
             color: green;
             margin-top: 0.5rem;
         }
+        .item-list {
+            text-align: left;
+        }
+        .item {
+            padding: 1rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .item-title {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .item-title a {
+            text-decoration: none;
+            color: #333;
+        }
+        .item-title a:hover {
+            text-decoration: underline;
+        }
+        .item-feed {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .item-content {
+            color: #444;
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
         .nav-bar {
             display: flex;
             justify-content: center;
@@ -73,7 +100,7 @@
             </div>
             
             <div id="page-read" class="page hidden">
-                <p>Coming soon...</p>
+                <div id="items-container"></div>
             </div>
             
             <div id="page-manage" class="page">

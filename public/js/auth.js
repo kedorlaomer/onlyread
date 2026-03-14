@@ -14,6 +14,7 @@ const importFileInput = document.getElementById('import-file');
 const importMessage = document.getElementById('import-message');
 const exportOpmlBtn = document.getElementById('export-opml-btn');
 const exportTextBtn = document.getElementById('export-text-btn');
+const itemsContainer = document.getElementById('items-container');
 
 const navRead = document.getElementById('nav-read');
 const navManage = document.getElementById('nav-manage');
@@ -24,7 +25,7 @@ const pageManage = document.getElementById('page-manage');
 let blobStore = null;
 let feedWorker = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -38,9 +39,11 @@ function showPage(pageName) {
     if (pageName === 'read') {
         navRead.classList.add('active');
         pageRead.classList.remove('hidden');
+        renderItems();
     } else if (pageName === 'manage') {
         navManage.classList.add('active');
         pageManage.classList.remove('hidden');
+        renderFeeds();
     }
 }
 
@@ -108,6 +111,92 @@ window.removeFeed = function(url) {
     removeFeed(url, blobStore);
     renderFeeds();
 };
+
+function parseRfc822Date(dateStr) {
+    if (!dateStr) return null;
+    try {
+        return new Date(dateStr);
+    } catch {
+        return null;
+    }
+}
+
+function truncateWords(text, wordCount) {
+    if (!text) return '';
+    const words = text.split(/\s+/);
+    if (words.length <= wordCount) return text;
+    return words.slice(0, wordCount).join(' ') + '...';
+}
+
+function truncateLines(text, lineCount) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    if (lines.length <= lineCount) return text;
+    return lines.slice(0, lineCount).join('\n') + '...';
+}
+
+function renderItems() {
+    if (!blobStore) return;
+    const feeds = getFeeds(blobStore);
+    
+    let allItems = [];
+    for (const feed of feeds) {
+        if (!feed.items) continue;
+        for (const item of feed.items) {
+            allItems.push({
+                ...item,
+                feedTitle: feed.title || feed.url,
+                feedLink: feed.link
+            });
+        }
+    }
+    
+    // Sort by pubDate descending
+    allItems.sort((a, b) => {
+        const dateA = parseRfc822Date(a.pubDate);
+        const dateB = parseRfc822Date(b.pubDate);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+    });
+    
+    if (allItems.length === 0) {
+        itemsContainer.innerHTML = '<p>No items yet.</p>';
+        return;
+    }
+    
+    itemsContainer.innerHTML = '<div class="item-list">' + allItems.map(item => {
+        const feedTitle = item.feedTitle;
+        let titleHtml = '';
+        let contentHtml = '';
+        
+        if (item.description) {
+            const words = item.description.split(/\s+/);
+            if (words.length > 20) {
+                const titleWords = words.slice(0, 15).join(' ');
+                const contentRest = words.slice(15).join(' ');
+                titleHtml = `${feedTitle}: ${titleWords}`;
+                contentHtml = truncateLines(contentRest, 4);
+            } else {
+                titleHtml = `${feedTitle}: ${item.description.slice(0, 100)}`;
+                contentHtml = truncateLines(item.description, 4);
+            }
+        } else {
+            titleHtml = feedTitle;
+            contentHtml = '';
+        }
+        
+        return `
+            <div class="item">
+                <div class="item-title">
+                    <a href="${item.link}" target="_blank">${titleHtml}</a>
+                </div>
+                ${contentHtml ? `<div class="item-content">${contentHtml}</div>` : ''}
+            </div>
+        `;
+    }).join('') + '</div>';
+}
 
 function unescapeXml(text) {
     if (!text) return null;
