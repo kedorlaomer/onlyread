@@ -504,6 +504,10 @@ itemsContainer.addEventListener('click', (e) => {
     const link = e.target.closest('a[data-item-link]');
     if (link) {
         const itemLink = link.getAttribute('data-item-link');
+        const itemId = link.id;
+        if (itemId) {
+            history.replaceState(null, '', `#${itemId}`);
+        }
         const feeds = getFeeds(blobStore);
         for (const feed of feeds) {
             if (!feed.items) continue;
