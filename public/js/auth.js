@@ -107,6 +107,16 @@ function renderFeeds() {
     `}).join('');
 }
 
+function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+}
+
 window.removeFeed = function(url) {
     removeFeed(url, blobStore);
     renderFeeds();
@@ -154,6 +164,25 @@ function stripHtml(html) {
     result = result.trim();
     
     return result;
+}
+
+function getItemId(item) {
+    return simpleHash(item.link);
+}
+
+function markItemAsRead(item, blobStore) {
+    const feeds = getFeeds(blobStore);
+    for (const feed of feeds) {
+        if (!feed.items) continue;
+        for (const fItem of feed.items) {
+            if (fItem.link === item.link) {
+                fItem.unread = false;
+                break;
+            }
+        }
+    }
+    blobStore.set('feeds', feeds);
+    blobStore.scheduleSync();
 }
 
 function renderItems() {
@@ -229,7 +258,7 @@ function renderItems() {
                     <span class="item-feed">(${feedTitle})</span>
                 </div>
                 <div class="item-title">
-                    <a href="${item.link}" target="_blank">${titleHtml}</a>
+                    <a href="${item.link}#${getItemId(item)}" target="_blank" data-item-link="${item.link}">${titleHtml}</a>
                 </div>
                 ${contentHtml ? `<div class="item-content">${contentHtml}</div>` : ''}
             </div>
@@ -469,6 +498,25 @@ netlifyIdentity.on('logout', () => {
         blobStore = null;
     }
     updateUI();
+});
+
+itemsContainer.addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-item-link]');
+    if (link) {
+        const itemLink = link.getAttribute('data-item-link');
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if (!feed.items) continue;
+            for (const item of feed.items) {
+                if (item.link === itemLink && item.unread) {
+                    item.unread = false;
+                    blobStore.set('feeds', feeds);
+                    blobStore.scheduleSync();
+                    break;
+                }
+            }
+        }
+    }
 });
 
 updateUI();
