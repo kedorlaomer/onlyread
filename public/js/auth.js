@@ -258,7 +258,7 @@ function renderItems() {
                     <span class="item-feed">(${feedTitle})</span>
                 </div>
                 <div class="item-title">
-                    <a href="${item.link}#${getItemId(item)}" target="_blank" data-item-link="${item.link}">${titleHtml}</a>
+                    <a href="${item.link}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${item.link}">${titleHtml}</a>
                 </div>
                 ${contentHtml ? `<div class="item-content">${contentHtml}</div>` : ''}
             </div>
