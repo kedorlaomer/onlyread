@@ -61,6 +61,8 @@ export function createBlobStore() {
     let ready = false;
     let blobAvailable = false;
     const pendingCallbacks = [];
+    let syncTimeout = null;
+    const SYNC_DEBOUNCE_MS = 2000; // 2 seconds
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -134,8 +136,16 @@ export function createBlobStore() {
         set(key, value) {
             if (!currentUserId) throw new Error('Store not initialized');
             const result = set(currentUserId, key, value);
-            const allData = getAllData(currentUserId);
-            worker.postMessage({ type: 'sync', payload: { data: allData } });
+            
+            // Debounce sync
+            if (syncTimeout) clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(() => {
+                const allData = getAllData(currentUserId);
+                if (worker) {
+                    worker.postMessage({ type: 'sync', payload: { data: allData } });
+                }
+            }, SYNC_DEBOUNCE_MS);
+            
             return result;
         },
 
@@ -151,6 +161,10 @@ export function createBlobStore() {
         },
 
         destroy() {
+            if (syncTimeout) {
+                clearTimeout(syncTimeout);
+                syncTimeout = null;
+            }
             if (worker) {
                 worker.postMessage({ type: 'stop' });
                 worker.terminate();
