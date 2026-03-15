@@ -24,6 +24,7 @@ const pageManage = document.getElementById('page-manage');
 
 let blobStore = null;
 let feedWorker = null;
+let hideRead = false;
 
 const DEBUG = false;
 function log(...args) {
@@ -54,6 +55,13 @@ navLogout.addEventListener('click', () => {
     netlifyIdentity.logout();
     loginPage.classList.remove('hidden');
     userPage.classList.add('hidden');
+});
+
+const toggleReadBtn = document.getElementById('toggle-read-btn');
+toggleReadBtn.addEventListener('click', () => {
+    hideRead = !hideRead;
+    toggleReadBtn.textContent = hideRead ? 'Show Read' : 'Hide Read';
+    renderItems();
 });
 
 function decodeJWT(token) {
@@ -211,6 +219,10 @@ function renderItems() {
         return dateB - dateA;
     });
     
+    if (hideRead) {
+        allItems = allItems.filter(item => item.unread !== false);
+    }
+    
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
         return;
@@ -252,7 +264,7 @@ function renderItems() {
         }
         
         return `
-            <div class="item">
+            <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
                     <span class="item-feed">(${feedTitle})</span>
