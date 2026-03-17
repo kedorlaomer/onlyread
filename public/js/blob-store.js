@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[BlobStore]', ...args);
 }
@@ -32,7 +32,25 @@ export function get(userId, key) {
 export function set(userId, key, value) {
     const storageKey = getStorageKey(userId, key);
     const jsonValue = JSON.stringify(value);
-    localStorage.setItem(storageKey, jsonValue);
+    try {
+        localStorage.setItem(storageKey, jsonValue);
+    } catch (e) {
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+            log('LocalStorage quota exceeded, clearing old data');
+            // Try to free space by removing old data
+            const oldKey = `blob_${userId}_old`;
+            localStorage.removeItem(oldKey);
+            // Shift current to old and try again
+            try {
+                localStorage.setItem(oldKey, localStorage.getItem(storageKey));
+                localStorage.setItem(storageKey, jsonValue);
+            } catch (e2) {
+                log('Failed to recover from quota error:', e2);
+            }
+        } else {
+            throw e;
+        }
+    }
     return { userId, key, value };
 }
 

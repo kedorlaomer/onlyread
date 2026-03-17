@@ -268,6 +268,12 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         }
     }
     
+    // Limit items per feed to prevent localStorage overflow
+    const MAX_ITEMS_PER_FEED = 100;
+    if (feeds[feedIndex].items.length > MAX_ITEMS_PER_FEED) {
+        feeds[feedIndex].items = feeds[feedIndex].items.slice(-MAX_ITEMS_PER_FEED);
+    }
+    
     store.set('feeds', feeds);
 }
 
