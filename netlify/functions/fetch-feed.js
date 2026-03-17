@@ -29,56 +29,79 @@ exports.handler = async (event, context) => {
 
     if (event.httpMethod === 'OPTIONS') return send(200, {});
 
-    const url = event.queryStringParameters?.url;
-    if (!url) {
-        return send(400, { error: 'Missing url parameter' });
-    }
-
-    const cacheKey = makeCacheKey(url);
-
-    // Check cache first
-    if (cacheStore) {
+    const urlParam = event.queryStringParameters?.url;
+    const urlsParam = event.queryStringParameters?.urls;
+    
+    let urls = [];
+    if (urlsParam) {
         try {
-            const cached = await cacheStore.get(cacheKey);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                const age = Date.now() - parsed.fetchedAt;
-                if (age < CACHE_TTL_MS) {
-                    return send(200, { ...parsed.data, cached: true, age });
-                }
-            }
-        } catch (e) {
-            // Cache miss or error, proceed to fetch
+            urls = JSON.parse(urlsParam);
+        } catch {
+            urls = urlsParam.split(',').map(u => decodeURIComponent(u.trim()));
         }
+    } else if (urlParam) {
+        urls = [urlParam];
+    }
+    
+    if (urls.length === 0) {
+        return send(400, { error: 'Missing url or urls parameter' });
     }
 
-    try {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'OnlyRead/1.0'
-            }
-        });
+    async function fetchOneUrl(url) {
+        const cacheKey = makeCacheKey(url);
 
-        const text = await response.text();
-        const contentType = response.headers.get('content-type') || '';
-
-        const result = { text, contentType };
-
-        // Store in cache
+        // Check cache first
         if (cacheStore) {
             try {
-                const cacheData = JSON.stringify({
-                    fetchedAt: Date.now(),
-                    data: result
-                });
-                await cacheStore.set(cacheKey, cacheData);
+                const cached = await cacheStore.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    const age = Date.now() - parsed.fetchedAt;
+                    if (age < CACHE_TTL_MS) {
+                        return { url, ...parsed.data, cached: true, age };
+                    }
+                }
             } catch (e) {
-                // Ignore cache write errors
+                // Cache miss or error, proceed to fetch
             }
         }
 
-        return send(200, result);
-    } catch (error) {
-        return send(500, { error: error.message });
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'OnlyRead/1.0'
+                }
+            });
+
+            const text = await response.text();
+            const contentType = response.headers.get('content-type') || '';
+
+            const result = { text, contentType };
+
+            // Store in cache
+            if (cacheStore) {
+                try {
+                    const cacheData = JSON.stringify({
+                        fetchedAt: Date.now(),
+                        data: result
+                    });
+                    await cacheStore.set(cacheKey, cacheData);
+                } catch (e) {
+                    // Ignore cache write errors
+                }
+            }
+
+            return { url, ...result };
+        } catch (error) {
+            return { url, error: error.message };
+        }
     }
+
+    if (urls.length === 1) {
+        const result = await fetchOneUrl(urls[0]);
+        return send(200, result);
+    }
+
+    const results = await Promise.all(urls.map(url => fetchOneUrl(url)));
+    return send(200, { results });
 };
