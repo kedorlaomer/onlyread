@@ -37,7 +37,7 @@ export async function subscribeToFeed(url, store) {
 
 async function validateFeed(url) {
     try {
-        const proxyUrl = `/.netlify/functions/fetch-feed?url=${encodeURIComponent(url)}`;
+        const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify([url]))}`;
         const response = await fetch(proxyUrl);
         if (!response.ok) {
             return { valid: false, error: `HTTP ${response.status}` };
@@ -192,11 +192,14 @@ export function exportFeedsAsText(store) {
 
 export async function fetchFeedItems(feedUrl) {
     try {
-        const response = await fetch(feedUrl);
+        const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify([feedUrl]))}`;
+        const response = await fetch(proxyUrl);
         if (!response.ok) {
             return [];
         }
-        const text = await response.text();
+        const data = await response.json();
+        const text = data.text;
+        if (!text) return [];
         const parser = new DOMParser();
         const xml = parser.parseFromString(text, 'application/xml');
         
