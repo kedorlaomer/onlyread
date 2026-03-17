@@ -145,18 +145,40 @@ export async function importFeeds(file, store, validate = true) {
             let skipped = 0;
             let invalid = 0;
 
-            for (const url of urls) {
-                if (currentFeeds.some(f => f.url === url)) {
-                    skipped++;
-                } else if (validate) {
-                    const validation = await validateFeed(url);
-                    if (validation.valid) {
+            // Filter out already-subscribed URLs
+            const newUrls = urls.filter(url => !currentFeeds.some(f => f.url === url));
+            skipped = urls.length - newUrls.length;
+
+            if (validate && newUrls.length > 0) {
+                // Batch fetch all new URLs at once
+                const results = await fetchFeedBatch(newUrls);
+                const validUrls = new Set();
+                
+                for (const result of results) {
+                    if (result && result.text) {
+                        const contentType = result.contentType || '';
+                        const isRss = contentType.includes('xml') || 
+                                      contentType.includes('rss') || 
+                                      contentType.includes('atom') ||
+                                      result.text.trim().startsWith('<?xml') ||
+                                      result.text.trim().startsWith('<rss') ||
+                                      result.text.trim().startsWith('<feed');
+                        if (isRss) {
+                            validUrls.add(result.feedUrl);
+                        }
+                    }
+                }
+
+                for (const url of newUrls) {
+                    if (validUrls.has(url)) {
                         currentFeeds.push({ url });
                         added++;
                     } else {
                         invalid++;
                     }
-                } else {
+                }
+            } else if (!validate) {
+                for (const url of newUrls) {
                     currentFeeds.push({ url });
                     added++;
                 }
