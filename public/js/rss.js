@@ -3,64 +3,31 @@ function log(...args) {
     if (DEBUG) console.log('[RSS]', ...args);
 }
 
-const BATCH_DELAY_MS = 500;
-let fetchQueue = [];
-let fetchTimeout = null;
-const fetchResolvers = new Map();
-const fetchPromises = [];
-
-async function fetchQueuedFeeds() {
-    if (fetchQueue.length === 0) return;
-    
-    log('Fetching batch:', fetchQueue.length, fetchQueue);
-    
-    const urls = [...fetchQueue];
-    const promises = [...fetchPromises];
-    
-    fetchQueue = [];
-    fetchPromises.length = 0;
-    fetchResolvers.clear();
+async function fetchFeedBatch(urls) {
+    if (!Array.isArray(urls)) urls = [urls];
+    if (urls.length === 0) return [];
     
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(urls))}`;
-        log('Batch URL:', proxyUrl);
         const response = await fetch(proxyUrl);
         
         if (!response.ok) {
-            log('Batch fetch failed:', response.status);
-            promises.forEach(p => p.resolve(null));
-            return;
+            return [];
         }
         
         const data = await response.json();
-        log('Batch response:', data);
         
         if (data.results) {
-            const resultMap = new Map(data.results.map(r => [r.url, r]));
-            promises.forEach(p => {
-                const result = resultMap.get(p.url);
-                p.resolve(result || null);
-            });
-        } else if (data.url) {
-            promises[0]?.resolve(data);
-        } else {
-            promises.forEach(p => p.resolve(null));
+            return data.results.filter(r => r.text).map(r => ({ feedUrl: r.url, text: r.text }));
         }
+        if (data.url && data.text) {
+            return [{ feedUrl: data.url, text: data.text }];
+        }
+        return [];
     } catch (e) {
         log('Batch fetch error:', e);
-        promises.forEach(p => p.resolve(null));
+        return [];
     }
-}
-
-function queueFeedFetch(url) {
-    return new Promise((resolve) => {
-        log('Queueing feed:', url);
-        fetchQueue.push(url);
-        fetchPromises.push({ url, resolve });
-        
-        if (fetchTimeout) clearTimeout(fetchTimeout);
-        fetchTimeout = setTimeout(fetchQueuedFeeds, BATCH_DELAY_MS);
-    });
 }
 
 export function validateUrl(string) {
@@ -97,7 +64,9 @@ export async function subscribeToFeed(url, store) {
 
 async function validateFeed(url) {
     try {
-        const data = await queueFeedFetch(url);
+        const results = await fetchFeedBatch([url]);
+        const data = results[0];
+        
         if (!data || !data.text) {
             return { valid: false, error: 'Failed to fetch feed' };
         }
@@ -250,7 +219,8 @@ export function exportFeedsAsText(store) {
 
 export async function fetchFeedItems(feedUrl) {
     try {
-        const data = await queueFeedFetch(feedUrl);
+        const results = await fetchFeedBatch([feedUrl]);
+        const data = results[0];
         if (!data || !data.text) {
             return [];
         }
