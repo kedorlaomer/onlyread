@@ -3,6 +3,100 @@ function log(...args) {
     if (DEBUG) console.log('[BlobStore]', ...args);
 }
 
+const DB_NAME = 'onlyread';
+const DB_VERSION = 1;
+const STORE_NAME = 'data';
+
+let db = null;
+const memoryCache = {};
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        if (db) {
+            resolve(db);
+            return;
+        }
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onerror = () => {
+            log('IndexedDB open error:', request.error);
+            reject(request.error);
+        };
+        
+        request.onsuccess = () => {
+            db = request.result;
+            log('IndexedDB opened');
+            resolve(db);
+        };
+        
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains(STORE_NAME)) {
+                database.createObjectStore(STORE_NAME);
+            }
+        };
+    });
+}
+
+function dbGet(key) {
+    return new Promise(async (resolve, reject) => {
+        const database = await openDB();
+        const transaction = database.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(key);
+        
+        request.onsuccess = () => {
+            resolve(request.result ?? null);
+        };
+        
+        request.onerror = () => {
+            reject(request.error);
+        };
+    });
+}
+
+function dbSet(key, value) {
+    return new Promise(async (resolve, reject) => {
+        const database = await openDB();
+        const transaction = database.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.put(value, key);
+        
+        request.onsuccess = () => {
+            resolve();
+        };
+        
+        request.onerror = () => {
+            reject(request.error);
+        };
+    });
+}
+
+function dbGetAllForUser(userId) {
+    return new Promise(async (resolve, reject) => {
+        const database = await openDB();
+        const transaction = database.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+        
+        request.onsuccess = () => {
+            const prefix = `blob_${userId}_`;
+            const result = {};
+            for (const item of request.result) {
+                if (item.key && item.key.startsWith(prefix)) {
+                    const shortKey = item.key.replace(prefix, '');
+                    result[shortKey] = item.value;
+                }
+            }
+            resolve(result);
+        };
+        
+        request.onerror = () => {
+            reject(request.error);
+        };
+    });
+}
+
 function validateUUID(uuid) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
@@ -15,63 +109,6 @@ function getStorageKey(userId, key) {
     return `blob_${userId}_${key}`;
 }
 
-export function get(userId, key) {
-    const storageKey = getStorageKey(userId, key);
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-        try {
-            return JSON.parse(stored);
-        } catch (e) {
-            log('Error parsing stored JSON:', e);
-            return null;
-        }
-    }
-    return null;
-}
-
-export function set(userId, key, value) {
-    const storageKey = getStorageKey(userId, key);
-    const jsonValue = JSON.stringify(value);
-    try {
-        localStorage.setItem(storageKey, jsonValue);
-    } catch (e) {
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-            log('LocalStorage quota exceeded, clearing old data');
-            // Try to free space by removing old data
-            const oldKey = `blob_${userId}_old`;
-            localStorage.removeItem(oldKey);
-            // Shift current to old and try again
-            try {
-                localStorage.setItem(oldKey, localStorage.getItem(storageKey));
-                localStorage.setItem(storageKey, jsonValue);
-            } catch (e2) {
-                log('Failed to recover from quota error:', e2);
-            }
-        } else {
-            throw e;
-        }
-    }
-    return { userId, key, value };
-}
-
-function getAllData(userId) {
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key.startsWith(`blob_${userId}_`)) {
-            keys.push(key);
-        }
-    }
-
-    const data = {};
-    for (const key of keys) {
-        const value = localStorage.getItem(key);
-        const shortKey = key.replace(`blob_${userId}_`, '');
-        data[shortKey] = JSON.parse(value);
-    }
-    return data;
-}
-
 export function createBlobStore() {
     const siteId = window.NETLIFY_IDENTITY ? window.NETLIFY_IDENTITY.site : null;
     let worker = null;
@@ -80,7 +117,7 @@ export function createBlobStore() {
     let blobAvailable = false;
     const pendingCallbacks = [];
     let syncTimeout = null;
-    const SYNC_DEBOUNCE_MS = 30000; // 30 seconds
+    const SYNC_DEBOUNCE_MS = 30000;
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -106,6 +143,14 @@ export function createBlobStore() {
             }
             currentUserId = userId;
 
+            try {
+                await openDB();
+                blobAvailable = true;
+            } catch (e) {
+                log('IndexedDB not available:', e);
+                blobAvailable = false;
+            }
+
             worker = new Worker('js/blob-worker.js', { type: 'module' });
 
             worker.onmessage = (e) => {
@@ -120,16 +165,27 @@ export function createBlobStore() {
                         break;
 
                     case 'syncFromBlob':
-                        for (const [key, value] of Object.entries(data)) {
-                            const storageKey = getStorageKey(userId, key);
-                            localStorage.setItem(storageKey, JSON.stringify(value));
-                        }
-                        log('Initialized from blob:', Object.keys(data));
+                        (async () => {
+                            for (const [key, value] of Object.entries(data)) {
+                                const storageKey = getStorageKey(userId, key);
+                                memoryCache[storageKey] = value;
+                                await dbSet(storageKey, value);
+                            }
+                            log('Initialized from blob:', Object.keys(data));
+                        })();
                         break;
 
                     case 'requestData':
-                        const allData = getAllData(userId);
-                        worker.postMessage({ type: 'sync', payload: { data: allData } });
+                        (async () => {
+                            const allData = {};
+                            for (const key of Object.keys(memoryCache)) {
+                                if (key.startsWith(`blob_${userId}_`)) {
+                                    const shortKey = key.replace(`blob_${userId}_`, '');
+                                    allData[shortKey] = memoryCache[key];
+                                }
+                            }
+                            worker.postMessage({ type: 'sync', payload: { data: allData } });
+                        })();
                         break;
 
                     case 'synced':
@@ -148,34 +204,58 @@ export function createBlobStore() {
 
         get(key) {
             if (!currentUserId) throw new Error('Store not initialized');
-            return get(currentUserId, key);
+            const storageKey = getStorageKey(currentUserId, key);
+            return memoryCache[storageKey] ?? null;
         },
 
         set(key, value) {
             if (!currentUserId) throw new Error('Store not initialized');
-            const result = set(currentUserId, key, value);
+            const storageKey = getStorageKey(currentUserId, key);
+            memoryCache[storageKey] = value;
             
             // Debounce sync
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
-                const allData = getAllData(currentUserId);
+                const keysToSync = Object.keys(memoryCache)
+                    .filter(k => k.startsWith(`blob_${currentUserId}_`))
+                    .map(k => k.replace(`blob_${currentUserId}_`, ''));
+                
+                const dataToSync = {};
+                for (const k of keysToSync) {
+                    dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
+                }
+                
                 if (worker) {
-                    worker.postMessage({ type: 'sync', payload: { data: allData } });
+                    worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
                 }
             }, SYNC_DEBOUNCE_MS);
-            
-            return result;
         },
 
         getAll() {
             if (!currentUserId) return {};
-            return getAllData(currentUserId);
+            const prefix = `blob_${currentUserId}_`;
+            const result = {};
+            for (const key of Object.keys(memoryCache)) {
+                if (key.startsWith(prefix)) {
+                    const shortKey = key.replace(prefix, '');
+                    result[shortKey] = memoryCache[key];
+                }
+            }
+            return result;
         },
 
-        async syncNow() {
+        syncNow() {
             if (!currentUserId || !worker) return;
-            const allData = getAllData(currentUserId);
-            worker.postMessage({ type: 'sync', payload: { data: allData } });
+            const keysToSync = Object.keys(memoryCache)
+                .filter(k => k.startsWith(`blob_${currentUserId}_`))
+                .map(k => k.replace(`blob_${currentUserId}_`, ''));
+            
+            const dataToSync = {};
+            for (const k of keysToSync) {
+                dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
+            }
+            
+            worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
         },
 
         destroy() {

@@ -190,7 +190,6 @@ function markItemAsRead(item, blobStore) {
         }
     }
     blobStore.set('feeds', feeds);
-    blobStore.scheduleSync();
 }
 
 function renderItems() {
