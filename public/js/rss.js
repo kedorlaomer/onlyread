@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[RSS]', ...args);
 }
@@ -7,45 +7,56 @@ const BATCH_DELAY_MS = 500;
 let fetchQueue = [];
 let fetchTimeout = null;
 const fetchResolvers = new Map();
+const fetchPromises = [];
 
 async function fetchQueuedFeeds() {
     if (fetchQueue.length === 0) return;
     
+    log('Fetching batch:', fetchQueue.length, fetchQueue);
+    
     const urls = [...fetchQueue];
-    const resolvers = urls.map(url => fetchResolvers.get(url)).filter(Boolean);
+    const promises = [...fetchPromises];
+    
     fetchQueue = [];
+    fetchPromises.length = 0;
     fetchResolvers.clear();
     
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(urls))}`;
+        log('Batch URL:', proxyUrl);
         const response = await fetch(proxyUrl);
         
         if (!response.ok) {
-            resolvers.forEach(r => r({}));
+            log('Batch fetch failed:', response.status);
+            promises.forEach(p => p.resolve(null));
             return;
         }
         
         const data = await response.json();
+        log('Batch response:', data);
         
         if (data.results) {
             const resultMap = new Map(data.results.map(r => [r.url, r]));
-            resolvers.forEach((resolve, i) => {
-                const result = resultMap.get(urls[i]);
-                resolve(result || null);
+            promises.forEach(p => {
+                const result = resultMap.get(p.url);
+                p.resolve(result || null);
             });
         } else if (data.url) {
-            resolvers[0]?.(data);
+            promises[0]?.resolve(data);
+        } else {
+            promises.forEach(p => p.resolve(null));
         }
     } catch (e) {
         log('Batch fetch error:', e);
-        resolvers.forEach(r => r(null));
+        promises.forEach(p => p.resolve(null));
     }
 }
 
 function queueFeedFetch(url) {
     return new Promise((resolve) => {
+        log('Queueing feed:', url);
         fetchQueue.push(url);
-        fetchResolvers.set(url, resolve);
+        fetchPromises.push({ url, resolve });
         
         if (fetchTimeout) clearTimeout(fetchTimeout);
         fetchTimeout = setTimeout(fetchQueuedFeeds, BATCH_DELAY_MS);
