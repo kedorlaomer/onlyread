@@ -3,6 +3,55 @@ function log(...args) {
     if (DEBUG) console.log('[RSS]', ...args);
 }
 
+const BATCH_DELAY_MS = 500;
+let fetchQueue = [];
+let fetchTimeout = null;
+const fetchResolvers = new Map();
+
+async function fetchQueuedFeeds() {
+    if (fetchQueue.length === 0) return;
+    
+    const urls = [...fetchQueue];
+    const resolvers = urls.map(url => fetchResolvers.get(url)).filter(Boolean);
+    fetchQueue = [];
+    fetchResolvers.clear();
+    
+    try {
+        const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(urls))}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            resolvers.forEach(r => r({}));
+            return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.results) {
+            const resultMap = new Map(data.results.map(r => [r.url, r]));
+            resolvers.forEach((resolve, i) => {
+                const result = resultMap.get(urls[i]);
+                resolve(result || null);
+            });
+        } else if (data.url) {
+            resolvers[0]?.(data);
+        }
+    } catch (e) {
+        log('Batch fetch error:', e);
+        resolvers.forEach(r => r(null));
+    }
+}
+
+function queueFeedFetch(url) {
+    return new Promise((resolve) => {
+        fetchQueue.push(url);
+        fetchResolvers.set(url, resolve);
+        
+        if (fetchTimeout) clearTimeout(fetchTimeout);
+        fetchTimeout = setTimeout(fetchQueuedFeeds, BATCH_DELAY_MS);
+    });
+}
+
 export function validateUrl(string) {
     try {
         const url = new URL(string);
@@ -37,13 +86,11 @@ export async function subscribeToFeed(url, store) {
 
 async function validateFeed(url) {
     try {
-        const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify([url]))}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) {
-            return { valid: false, error: `HTTP ${response.status}` };
+        const data = await queueFeedFetch(url);
+        if (!data || !data.text) {
+            return { valid: false, error: 'Failed to fetch feed' };
         }
-
-        const data = await response.json();
+        
         const contentType = data.contentType || '';
         const text = data.text;
 
@@ -192,14 +239,11 @@ export function exportFeedsAsText(store) {
 
 export async function fetchFeedItems(feedUrl) {
     try {
-        const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify([feedUrl]))}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) {
+        const data = await queueFeedFetch(feedUrl);
+        if (!data || !data.text) {
             return [];
         }
-        const data = await response.json();
         const text = data.text;
-        if (!text) return [];
         const parser = new DOMParser();
         const xml = parser.parseFromString(text, 'application/xml');
         
