@@ -59,11 +59,15 @@ exports.handler = async (event, context) => {
             let data;
             try {
                 data = JSON.parse(event.body);
-            } catch {
-                return send(400, { error: 'Invalid JSON' });
+            } catch (e) {
+                return send(400, { error: 'Invalid JSON', bodyLength: event.body?.length });
             }
-            await store.setJSON(userId, data);
-            return send(200, { success: true });
+            try {
+                await store.setJSON(userId, data);
+                return send(200, { success: true, size: JSON.stringify(data).length });
+            } catch (e) {
+                return send(500, { error: e.message, stack: e.stack });
+            }
         }
 
         return send(405, { error: 'Method not allowed' });
