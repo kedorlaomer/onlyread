@@ -39,15 +39,25 @@ async function syncFromBlob() {
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
+    const dataSize = JSON.stringify(data).length;
+    log('syncToBlob called, data size:', dataSize);
+    
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        log('syncToBlob response:', response.status, response.statusText);
+        if (!response.ok) {
+            const text = await response.text();
+            log('syncToBlob error body:', text);
+            throw new Error(`HTTP ${response.status}: ${text}`);
+        }
         self.postMessage({ type: 'synced' });
-    } catch (e) {}
+    } catch (e) {
+        log('syncToBlob failed:', e.message);
+    }
 }
 
 function startSync() {

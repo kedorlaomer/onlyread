@@ -212,6 +212,7 @@ export function createBlobStore() {
             if (!currentUserId) throw new Error('Store not initialized');
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
+            log('set() called for key:', key, 'cache size:', JSON.stringify(memoryCache).length);
             
             // Debounce sync
             if (syncTimeout) clearTimeout(syncTimeout);
@@ -225,6 +226,7 @@ export function createBlobStore() {
                     dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
                 }
                 
+                log('Scheduling sync for', keysToSync.length, 'keys, total size:', JSON.stringify(dataToSync).length);
                 if (worker) {
                     worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
                 }
