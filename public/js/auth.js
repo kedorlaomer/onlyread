@@ -382,6 +382,7 @@ function initFeedWorker(userId) {
                         updateFeedMeta(payload.feedUrl, result.title, result.link, blobStore);
                     }
                     renderFeeds();
+                    renderItems();
                 }
                 break;
         }
