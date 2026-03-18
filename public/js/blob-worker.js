@@ -39,20 +39,16 @@ async function syncFromBlob() {
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
-    const dataSize = JSON.stringify(data).length;
+    const dataString = JSON.stringify(data);
+    const dataSize = dataString.length;
     log('syncToBlob called, data size:', dataSize);
-    
-    // Skip if data is too large (> 1MB) - browser may not send it properly
-    if (dataSize > 1024 * 1024) {
-        log('syncToBlob skipped: data too large');
-        return;
-    }
+    log('syncToBlob data keys:', Object.keys(data));
     
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: dataString
         });
         log('syncToBlob response:', response.status, response.statusText);
         if (!response.ok) {
