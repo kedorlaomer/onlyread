@@ -45,9 +45,13 @@ async function syncToBlob(data) {
     log('syncToBlob data keys:', Object.keys(data));
     
     try {
+        log('syncToBlob: creating request...');
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Content-Length': dataSize.toString()
+            },
             body: dataString
         });
         log('syncToBlob response:', response.status, response.statusText);
