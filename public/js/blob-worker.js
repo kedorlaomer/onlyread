@@ -42,6 +42,12 @@ async function syncToBlob(data) {
     const dataSize = JSON.stringify(data).length;
     log('syncToBlob called, data size:', dataSize);
     
+    // Skip if data is too large (> 1MB) - browser may not send it properly
+    if (dataSize > 1024 * 1024) {
+        log('syncToBlob skipped: data too large');
+        return;
+    }
+    
     try {
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
