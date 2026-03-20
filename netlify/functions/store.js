@@ -1,5 +1,4 @@
 const { getStore } = require('@netlify/blobs');
-const zlib = require('zlib');
 
 let store = null;
 try {
@@ -15,7 +14,7 @@ try {
 exports.handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Compressed',
+        'Access-Control-Allow-Headers': 'Content-Type',
         'Content-Type': 'application/json'
     };
 
@@ -57,24 +56,9 @@ exports.handler = async (event, context) => {
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
-            let body = event.body || '{}';
-            
-            // Handle compressed data
-            if (event.headers['x-compressed'] === 'gzip') {
-                try {
-                    const parsed = JSON.parse(body);
-                    if (parsed.compressed && parsed.data) {
-                        const buffer = Buffer.from(parsed.data, 'base64');
-                        body = zlib.gunzipSync(buffer).toString();
-                    }
-                } catch (e) {
-                    return send(400, { error: 'Failed to decompress: ' + e.message });
-                }
-            }
-            
             let data;
             try {
-                data = JSON.parse(body);
+                data = JSON.parse(event.body);
             } catch (e) {
                 return send(400, { error: 'Invalid JSON' });
             }
@@ -91,13 +75,24 @@ exports.handler = async (event, context) => {
                 }
                 
                 if (data.partial && data.data) {
-                    const merged = { ...existingData, ...data.data };
+                    // Merge partial data
+                    const merged = { ...existingData };
+                    
+                    for (const [key, value] of Object.entries(data.data)) {
+                        if (key === 'feeds' && Array.isArray(value)) {
+                            // Append feeds arrays together
+                            if (!Array.isArray(merged.feeds)) {
+                                merged.feeds = [];
+                            }
+                            merged.feeds = [...merged.feeds, ...value];
+                        } else {
+                            merged[key] = value;
+                        }
+                    }
+                    
                     await store.setJSON(userId, merged);
-                } else if (!data.partial) {
-                    // Full data object (not wrapped in {partial, data})
-                    await store.setJSON(userId, data);
                 } else {
-                    return send(400, { error: 'Invalid request format' });
+                    await store.setJSON(userId, data);
                 }
                 return send(200, { success: true });
             } catch (e) {

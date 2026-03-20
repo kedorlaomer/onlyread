@@ -36,122 +36,107 @@ async function syncFromBlob() {
     } catch (e) {}
 }
 
-const BATCH_SIZE_BYTES = 1024 * 1024; // 1MB
-
-function uint8ArrayToBase64(bytes) {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-async function compressData(dataString) {
-    const encoder = new CompressionStream('gzip');
-    const writer = encoder.writable.getWriter();
-    writer.write(new TextEncoder().encode(dataString));
-    writer.close();
-    const reader = encoder.readable.getReader();
-    const chunks = [];
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-    }
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const result = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return uint8ArrayToBase64(result);
-}
-
-async function sendBatch(data, userId) {
-    const dataString = JSON.stringify(data);
-    const dataSize = dataString.length;
-    
-    // Compress if single batch exceeds 1MB
-    if (dataSize > BATCH_SIZE_BYTES) {
-        log('sendBatch: compressing data of size:', dataSize);
-        try {
-            const compressed = await compressData(dataString);
-            const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-Compressed': 'gzip'
-                },
-                body: JSON.stringify({ partial: true, compressed: true, data: compressed })
-            });
-            if (!response.ok) {
-                const text = await response.text();
-                log('sendBatch compression error:', text);
-                return { ok: false, text };
-            }
-            return { ok: true };
-        } catch (e) {
-            log('sendBatch compression failed:', e.message);
-            return { ok: false, text: e.message };
-        }
-    }
-    
-    // Regular JSON batch
-    try {
-        const response = await fetch(`/.netlify/functions/store/${userId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: dataString
-        });
-        if (!response.ok) {
-            const text = await response.text();
-            log('sendBatch error:', text);
-            return { ok: false, text };
-        }
-        return { ok: true };
-    } catch (e) {
-        log('sendBatch failed:', e.message);
-        return { ok: false, text: e.message };
-    }
-}
+const FEEDS_PER_BATCH = 50;
 
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
     const dataString = JSON.stringify(data);
     const dataSize = dataString.length;
-    log('syncToBlob called, data size:', dataSize);
-    log('syncToBlob data keys:', Object.keys(data));
+    log('syncToBlob called, data size:', dataSize, 'keys:', Object.keys(data));
     
-    // Send data in batches of ~1MB to avoid size limits
     const keys = Object.keys(data);
     let currentBatch = {};
     let currentBatchSize = 0;
+    let batchCount = 0;
     
     for (const key of keys) {
-        const itemSize = JSON.stringify(data[key]).length;
+        const value = data[key];
         
-        // If adding this item would exceed 1MB and we have items, send current batch
-        if (currentBatchSize + itemSize > BATCH_SIZE_BYTES && Object.keys(currentBatch).length > 0) {
-            log('syncToBlob: sending batch, size:', JSON.stringify(currentBatch).length, 'keys:', Object.keys(currentBatch).length);
-            await sendBatch({ partial: true, data: currentBatch }, userId);
+        // For feeds array, batch by items
+        if (key === 'feeds' && Array.isArray(value)) {
+            const feedBatches = [];
+            for (let i = 0; i < value.length; i += FEEDS_PER_BATCH) {
+                feedBatches.push(value.slice(i, i + FEEDS_PER_BATCH));
+            }
             
-            currentBatch = {};
-            currentBatchSize = 0;
+            log('syncToBlob: splitting feeds into', feedBatches.length, 'batches of ~', FEEDS_PER_BATCH);
+            
+            for (const feedBatch of feedBatches) {
+                batchCount++;
+                const batchData = { ...currentBatch, [key]: feedBatch };
+                
+                log('syncToBlob: sending batch', batchCount, 'with', feedBatch.length, 'feeds, size:', JSON.stringify(batchData).length);
+                
+                try {
+                    const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ partial: true, data: batchData })
+                    });
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        log('syncToBlob batch error:', text);
+                    }
+                } catch (e) {
+                    log('syncToBlob batch failed:', e.message);
+                }
+            }
+        } else {
+            // Non-feeds data: use size-based batching
+            const itemSize = JSON.stringify(value).length;
+            
+            if (currentBatchSize + itemSize > BATCH_SIZE_BYTES && Object.keys(currentBatch).length > 0) {
+                batchCount++;
+                log('syncToBlob: sending batch', batchCount, 'size:', JSON.stringify(currentBatch).length);
+                
+                try {
+                    const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ partial: true, data: currentBatch })
+                    });
+                    
+                    if (!response.ok) {
+                        const text = await response.text();
+                        log('syncToBlob batch error:', text);
+                    }
+                } catch (e) {
+                    log('syncToBlob batch failed:', e.message);
+                }
+                
+                currentBatch = {};
+                currentBatchSize = 0;
+            }
+            
+            currentBatch[key] = value;
+            currentBatchSize += itemSize;
         }
-        
-        // Add item to current batch
-        currentBatch[key] = data[key];
-        currentBatchSize += itemSize;
     }
     
-    // Send remaining batch
+    // Send remaining non-feeds batch
     if (Object.keys(currentBatch).length > 0) {
-        log('syncToBlob: sending final batch, size:', JSON.stringify(currentBatch).length, 'keys:', Object.keys(currentBatch).length);
-        await sendBatch({ partial: true, data: currentBatch }, userId);
+        batchCount++;
+        log('syncToBlob: sending final batch', batchCount, 'size:', JSON.stringify(currentBatch).length);
+        
+        try {
+            const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partial: true, data: currentBatch })
+            });
+            
+            if (!response.ok) {
+                const text = await response.text();
+                log('syncToBlob batch error:', text);
+            }
+        } catch (e) {
+            log('syncToBlob batch failed:', e.message);
+        }
     }
     
+    log('syncToBlob: complete,', batchCount, 'batches sent');
     self.postMessage({ type: 'synced' });
 }
 
