@@ -1,5 +1,3 @@
-import pako from 'pako';
-
 const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[BlobWorker]', ...args);
@@ -46,35 +44,10 @@ async function syncToBlob(data) {
     log('syncToBlob called, data size:', dataSize);
     log('syncToBlob data keys:', Object.keys(data));
     
-    // Netlify Blobs has ~4.5MB limit - compress if over 4MB
+    // Skip if data is too large for now
     if (dataSize > 4 * 1024 * 1024) {
-        log('syncToBlob: data too large for blobs, compressing...');
-        try {
-            const compressed = pako.deflate(dataString);
-            const base64 = btoa(String.fromCharCode.apply(null, compressed));
-            const compressedSize = base64.length;
-            log('syncToBlob: compressed from', dataSize, 'to', compressedSize);
-            
-            const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Content-Length': compressedSize.toString(),
-                    'X-Compressed': 'gzip'
-                },
-                body: JSON.stringify({ compressed: true, data: base64 })
-            });
-            
-            if (!response.ok) {
-                const text = await response.text();
-                log('syncToBlob compression error:', text);
-                throw new Error(`HTTP ${response.status}`);
-            }
-            self.postMessage({ type: 'synced' });
-            return;
-        } catch (e) {
-            log('syncToBlob compression failed:', e.message);
-        }
+        log('syncToBlob skipped: data too large for blobs');
+        return;
     }
     
     try {
