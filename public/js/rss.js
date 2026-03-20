@@ -118,6 +118,8 @@ function extractUrlsFromText(text) {
     return urls;
 }
 
+const BATCH_FETCH_SIZE = 10;
+
 export async function importFeeds(file, store, validate = true) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -150,21 +152,25 @@ export async function importFeeds(file, store, validate = true) {
             skipped = urls.length - newUrls.length;
 
             if (validate && newUrls.length > 0) {
-                // Batch fetch all new URLs at once
-                const results = await fetchFeedBatch(newUrls);
+                // Batch fetch new URLs in chunks
                 const validUrls = new Set();
                 
-                for (const result of results) {
-                    if (result && result.text) {
-                        const contentType = result.contentType || '';
-                        const isRss = contentType.includes('xml') || 
-                                      contentType.includes('rss') || 
-                                      contentType.includes('atom') ||
-                                      result.text.trim().startsWith('<?xml') ||
-                                      result.text.trim().startsWith('<rss') ||
-                                      result.text.trim().startsWith('<feed');
-                        if (isRss) {
-                            validUrls.add(result.feedUrl);
+                for (let i = 0; i < newUrls.length; i += BATCH_FETCH_SIZE) {
+                    const chunk = newUrls.slice(i, i + BATCH_FETCH_SIZE);
+                    const results = await fetchFeedBatch(chunk);
+                    
+                    for (const result of results) {
+                        if (result && result.text) {
+                            const contentType = result.contentType || '';
+                            const isRss = contentType.includes('xml') || 
+                                          contentType.includes('rss') || 
+                                          contentType.includes('atom') ||
+                                          result.text.trim().startsWith('<?xml') ||
+                                          result.text.trim().startsWith('<rss') ||
+                                          result.text.trim().startsWith('<feed');
+                            if (isRss) {
+                                validUrls.add(result.feedUrl);
+                            }
                         }
                     }
                 }

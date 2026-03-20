@@ -145,6 +145,13 @@ export function createBlobStore() {
 
             try {
                 await openDB();
+                // Load existing data from IndexedDB into memoryCache
+                const allData = await dbGetAllForUser(userId);
+                for (const [key, value] of Object.entries(allData)) {
+                    const storageKey = getStorageKey(userId, key);
+                    memoryCache[storageKey] = value;
+                }
+                log('Loaded from IndexedDB:', Object.keys(allData));
                 blobAvailable = true;
             } catch (e) {
                 log('IndexedDB not available:', e);
