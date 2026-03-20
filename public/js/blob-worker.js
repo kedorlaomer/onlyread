@@ -36,6 +36,28 @@ async function syncFromBlob() {
     } catch (e) {}
 }
 
+async function compressData(dataString) {
+    const encoder = new CompressionStream('gzip');
+    const writer = encoder.writable.getWriter();
+    writer.write(new TextEncoder().encode(dataString));
+    writer.close();
+    const reader = encoder.readable.getReader();
+    const chunks = [];
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return result;
+}
+
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
@@ -44,21 +66,29 @@ async function syncToBlob(data) {
     log('syncToBlob called, data size:', dataSize);
     log('syncToBlob data keys:', Object.keys(data));
     
-    // Skip if data is too large for now
-    if (dataSize > 4 * 1024 * 1024) {
-        log('syncToBlob skipped: data too large for blobs');
-        return;
-    }
-    
     try {
+        let body = dataString;
+        let headers = { 
+            'Content-Type': 'application/json',
+            'Content-Length': dataSize.toString()
+        };
+        
+        // Compress if data is too large
+        if (dataSize > 4 * 1024 * 1024) {
+            log('syncToBlob: compressing large data...');
+            const compressed = await compressData(dataString);
+            const base64 = btoa(String.fromCharCode.apply(null, compressed));
+            body = JSON.stringify({ compressed: true, data: base64 });
+            headers['Content-Length'] = body.length.toString();
+            headers['X-Compressed'] = 'gzip';
+            log('syncToBlob: compressed from', dataSize, 'to', body.length);
+        }
+        
         log('syncToBlob: creating request...');
         const response = await fetch(`/.netlify/functions/store/${userId}`, {
             method: 'PUT',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Content-Length': dataSize.toString()
-            },
-            body: dataString
+            headers,
+            body
         });
         log('syncToBlob response:', response.status, response.statusText);
         if (!response.ok) {
