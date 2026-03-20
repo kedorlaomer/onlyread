@@ -64,7 +64,8 @@ exports.handler = async (event, context) => {
                 try {
                     const parsed = JSON.parse(body);
                     if (parsed.compressed && parsed.data) {
-                        body = zlib.inflateSync(Buffer.from(parsed.data, 'base64')).toString();
+                        const buffer = Buffer.from(parsed.data, 'base64');
+                        body = zlib.gunzipSync(buffer).toString();
                     }
                 } catch (e) {
                     return send(400, { error: 'Failed to decompress: ' + e.message });
