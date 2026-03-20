@@ -22,10 +22,31 @@ async function fetchFeedBatch(feedUrls) {
         const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(feedUrls))}`;
         const response = await fetch(proxyUrl);
         log('Fetch response:', response.status);
+        
         if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            if (errorText.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
+                log('Response too large, retrying element by element');
+                const results = [];
+                for (const url of feedUrls) {
+                    const singleResult = await fetchFeedBatch([url]);
+                    results.push(...singleResult);
+                }
+                return results;
+            }
             return [];
         }
+        
         const data = await response.json();
+        if (data.error && data.error.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
+            log('Response too large (from JSON), retrying element by element');
+            const results = [];
+            for (const url of feedUrls) {
+                const singleResult = await fetchFeedBatch([url]);
+                results.push(...singleResult);
+            }
+            return results;
+        }
         if (data.results) {
             return data.results
                 .filter(r => r.text)
