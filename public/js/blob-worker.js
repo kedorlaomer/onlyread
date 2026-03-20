@@ -36,6 +36,14 @@ async function syncFromBlob() {
     } catch (e) {}
 }
 
+function uint8ArrayToBase64(bytes) {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
 async function compressData(dataString) {
     const encoder = new CompressionStream('gzip');
     const writer = encoder.writable.getWriter();
@@ -55,7 +63,7 @@ async function compressData(dataString) {
         result.set(chunk, offset);
         offset += chunk.length;
     }
-    return result;
+    return uint8ArrayToBase64(result);
 }
 
 async function syncToBlob(data) {
@@ -76,8 +84,7 @@ async function syncToBlob(data) {
         // Compress if data is too large
         if (dataSize > 4 * 1024 * 1024) {
             log('syncToBlob: compressing large data...');
-            const compressed = await compressData(dataString);
-            const base64 = btoa(String.fromCharCode.apply(null, compressed));
+            const base64 = await compressData(dataString);
             body = JSON.stringify({ compressed: true, data: base64 });
             headers['Content-Length'] = body.length.toString();
             headers['X-Compressed'] = 'gzip';
