@@ -1,5 +1,4 @@
 const { getStore } = require('@netlify/blobs');
-const zlib = require('zlib');
 
 let store = null;
 try {
@@ -15,7 +14,7 @@ try {
 exports.handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Compressed',
+        'Access-Control-Allow-Headers': 'Content-Type',
         'Content-Type': 'application/json'
     };
 
@@ -57,32 +56,35 @@ exports.handler = async (event, context) => {
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
-            let body = event.body || '{}';
-            
-            // Handle compressed data
-            if (event.headers['x-compressed'] === 'gzip') {
-                try {
-                    const parsed = JSON.parse(body);
-                    if (parsed.compressed && parsed.data) {
-                        const buffer = Buffer.from(parsed.data, 'base64');
-                        body = zlib.gunzipSync(buffer).toString();
-                    }
-                } catch (e) {
-                    return send(400, { error: 'Failed to decompress: ' + e.message });
-                }
-            }
-            
             let data;
             try {
-                data = JSON.parse(body);
+                data = JSON.parse(event.body);
             } catch (e) {
-                return send(400, { error: 'Invalid JSON', bodyLength: body?.length });
+                return send(400, { error: 'Invalid JSON' });
             }
+            
             try {
-                await store.setJSON(userId, data);
-                return send(200, { success: true, size: JSON.stringify(data).length });
+                let existingData = {};
+                try {
+                    const raw = await store.get(userId);
+                    if (raw) {
+                        existingData = JSON.parse(raw);
+                    }
+                } catch (e) {
+                    // No existing data, start fresh
+                }
+                
+                if (data.partial && data.data) {
+                    // Partial update - merge with existing
+                    const merged = { ...existingData, ...data.data };
+                    await store.setJSON(userId, merged);
+                } else {
+                    // Full update
+                    await store.setJSON(userId, data);
+                }
+                return send(200, { success: true });
             } catch (e) {
-                return send(500, { error: e.message, stack: e.stack });
+                return send(500, { error: e.message });
             }
         }
 

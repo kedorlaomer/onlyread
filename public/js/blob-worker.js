@@ -36,35 +36,7 @@ async function syncFromBlob() {
     } catch (e) {}
 }
 
-function uint8ArrayToBase64(bytes) {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-async function compressData(dataString) {
-    const encoder = new CompressionStream('gzip');
-    const writer = encoder.writable.getWriter();
-    writer.write(new TextEncoder().encode(dataString));
-    writer.close();
-    const reader = encoder.readable.getReader();
-    const chunks = [];
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-    }
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const result = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
-    }
-    return uint8ArrayToBase64(result);
-}
+const BATCH_SIZE = 10;
 
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
@@ -74,39 +46,34 @@ async function syncToBlob(data) {
     log('syncToBlob called, data size:', dataSize);
     log('syncToBlob data keys:', Object.keys(data));
     
-    try {
-        let body = dataString;
-        let headers = { 
-            'Content-Type': 'application/json',
-            'Content-Length': dataSize.toString()
-        };
-        
-        // Compress if data is too large
-        if (dataSize > 4 * 1024 * 1024) {
-            log('syncToBlob: compressing large data...');
-            const base64 = await compressData(dataString);
-            body = JSON.stringify({ compressed: true, data: base64 });
-            headers['Content-Length'] = body.length.toString();
-            headers['X-Compressed'] = 'gzip';
-            log('syncToBlob: compressed from', dataSize, 'to', body.length);
+    // Send data in batches of 10 to avoid size limits
+    const keys = Object.keys(data);
+    for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+        const batchKeys = keys.slice(i, i + BATCH_SIZE);
+        const batchData = {};
+        for (const key of batchKeys) {
+            batchData[key] = data[key];
         }
         
-        log('syncToBlob: creating request...');
-        const response = await fetch(`/.netlify/functions/store/${userId}`, {
-            method: 'PUT',
-            headers,
-            body
-        });
-        log('syncToBlob response:', response.status, response.statusText);
-        if (!response.ok) {
-            const text = await response.text();
-            log('syncToBlob error body:', text);
-            throw new Error(`HTTP ${response.status}: ${text}`);
+        log('syncToBlob: sending batch', batchKeys, 'size:', JSON.stringify(batchData).length);
+        
+        try {
+            const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partial: true, data: batchData })
+            });
+            
+            if (!response.ok) {
+                const text = await response.text();
+                log('syncToBlob batch error:', text);
+            }
+        } catch (e) {
+            log('syncToBlob batch failed:', e.message);
         }
-        self.postMessage({ type: 'synced' });
-    } catch (e) {
-        log('syncToBlob failed:', e.message);
     }
+    
+    self.postMessage({ type: 'synced' });
 }
 
 function startSync() {
