@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs');
+const zlib = require('zlib');
 
 let store = null;
 try {
@@ -14,7 +15,7 @@ try {
 exports.handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Compressed',
         'Content-Type': 'application/json'
     };
 
@@ -56,9 +57,24 @@ exports.handler = async (event, context) => {
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
+            let body = event.body || '{}';
+            
+            // Handle compressed data
+            if (event.headers['x-compressed'] === 'gzip') {
+                try {
+                    const parsed = JSON.parse(body);
+                    if (parsed.compressed && parsed.data) {
+                        const buffer = Buffer.from(parsed.data, 'base64');
+                        body = zlib.gunzipSync(buffer).toString();
+                    }
+                } catch (e) {
+                    return send(400, { error: 'Failed to decompress: ' + e.message });
+                }
+            }
+            
             let data;
             try {
-                data = JSON.parse(event.body);
+                data = JSON.parse(body);
             } catch (e) {
                 return send(400, { error: 'Invalid JSON' });
             }
@@ -71,16 +87,17 @@ exports.handler = async (event, context) => {
                         existingData = JSON.parse(raw);
                     }
                 } catch (e) {
-                    // No existing data, start fresh
+                    // No existing data
                 }
                 
                 if (data.partial && data.data) {
-                    // Partial update - merge with existing
                     const merged = { ...existingData, ...data.data };
                     await store.setJSON(userId, merged);
-                } else {
-                    // Full update
+                } else if (!data.partial) {
+                    // Full data object (not wrapped in {partial, data})
                     await store.setJSON(userId, data);
+                } else {
+                    return send(400, { error: 'Invalid request format' });
                 }
                 return send(200, { success: true });
             } catch (e) {
