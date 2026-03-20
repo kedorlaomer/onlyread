@@ -369,6 +369,9 @@ function initFeedWorker(userId) {
         const { type, payload } = e.data;
         
         switch (type) {
+            case 'ready':
+                console.log('[Auth] Feed worker ready');
+                break;
             case 'getFeeds':
                 const feeds = blobStore.getAll().feeds || [];
                 feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
@@ -392,6 +395,7 @@ function initFeedWorker(userId) {
         type: 'init',
         payload: { userId }
     });
+    console.log('[Auth] Feed worker initialized, waiting for ready...');
 }
 
 function stopFeedWorker() {
