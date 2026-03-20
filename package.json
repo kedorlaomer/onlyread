@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/kedorlaomer/onlyread#readme",
   "dependencies": {
-    "@netlify/blobs": "^10.7.0"
+    "@netlify/blobs": "^10.7.0",
+    "pako": "^2.1.0"
   }
 }

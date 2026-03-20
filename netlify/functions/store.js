@@ -1,4 +1,5 @@
 const { getStore } = require('@netlify/blobs');
+const zlib = require('zlib');
 
 let store = null;
 try {
@@ -14,7 +15,7 @@ try {
 exports.handler = async (event, context) => {
     const headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Compressed',
         'Content-Type': 'application/json'
     };
 
@@ -56,11 +57,25 @@ exports.handler = async (event, context) => {
         }
 
         if (event.httpMethod === 'PUT' || event.httpMethod === 'POST') {
+            let body = event.body || '{}';
+            
+            // Handle compressed data
+            if (event.headers['x-compressed'] === 'gzip') {
+                try {
+                    const parsed = JSON.parse(body);
+                    if (parsed.compressed && parsed.data) {
+                        body = zlib.inflateSync(Buffer.from(parsed.data, 'base64')).toString();
+                    }
+                } catch (e) {
+                    return send(400, { error: 'Failed to decompress: ' + e.message });
+                }
+            }
+            
             let data;
             try {
-                data = JSON.parse(event.body);
+                data = JSON.parse(body);
             } catch (e) {
-                return send(400, { error: 'Invalid JSON', bodyLength: event.body?.length });
+                return send(400, { error: 'Invalid JSON', bodyLength: body?.length });
             }
             try {
                 await store.setJSON(userId, data);
