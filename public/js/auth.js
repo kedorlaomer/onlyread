@@ -494,12 +494,17 @@ exportTextBtn.addEventListener('click', () => {
 });
 
 netlifyIdentity.on('login', async (user) => {
+    console.log('[Auth] Login event fired, user:', user?.email);
     const jwtPayload = decodeJWT(user.token);
+    console.log('[Auth] JWT payload:', jwtPayload);
     if (jwtPayload?.sub) {
+        console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
+        console.log('[Auth] Blob store initialized, initializing feed worker');
         initFeedWorker(jwtPayload.sub);
     }
+    console.log('[Auth] Calling updateUI');
     updateUI();
 });
 
