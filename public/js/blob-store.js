@@ -77,23 +77,40 @@ function dbGetAllForUser(userId) {
         const database = await openDB();
         const transaction = database.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAll();
         
-        request.onsuccess = () => {
-            const prefix = `blob_${userId}_`;
-            const result = {};
-            for (const item of request.result) {
-                if (item.key && item.key.startsWith(prefix)) {
-                    const shortKey = item.key.replace(prefix, '');
-                    result[shortKey] = item.value;
-                }
+        const result = {};
+        let pending = 1;
+        
+        function done() {
+            pending--;
+            if (pending === 0) {
+                resolve(result);
             }
-            resolve(result);
-        };
+        }
         
-        request.onerror = () => {
-            reject(request.error);
+        // Get all keys
+        const keyRequest = store.getAllKeys();
+        keyRequest.onsuccess = () => {
+            const prefix = `blob_${userId}_`;
+            const keysToFetch = keyRequest.result.filter(k => typeof k === 'string' && k.startsWith(prefix));
+            pending = keysToFetch.length;
+            
+            if (pending === 0) {
+                resolve(result);
+                return;
+            }
+            
+            for (const key of keysToFetch) {
+                const valueRequest = store.get(key);
+                valueRequest.onsuccess = () => {
+                    const shortKey = key.replace(prefix, '');
+                    result[shortKey] = valueRequest.result;
+                    done();
+                };
+                valueRequest.onerror = () => done();
+            }
         };
+        keyRequest.onerror = () => reject(keyRequest.error);
     });
 }
 
