@@ -64,6 +64,11 @@ toggleReadBtn.addEventListener('click', () => {
     renderItems();
 });
 
+const reloadBtn = document.getElementById('reload-btn');
+reloadBtn.addEventListener('click', () => {
+    triggerFeedScan();
+});
+
 function decodeJWT(token) {
     if (typeof token !== 'string') {
         if (token && token.access_token) {

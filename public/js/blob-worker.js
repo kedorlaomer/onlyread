@@ -137,7 +137,7 @@ function startSync() {
     if (syncInterval) return;
     syncInterval = setInterval(() => {
         self.postMessage({ type: 'requestData' });
-    }, 60000);
+    }, 3600000); // 1 hour
 }
 
 function stopSync() {
