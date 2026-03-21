@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[BlobWorker]', ...args);
 }
@@ -7,6 +7,7 @@ let userId = null;
 let siteId = null;
 let syncInterval = null;
 let blobAvailable = false;
+let isSyncing = false;
 
 function validateUUID(uuid) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -183,7 +184,16 @@ self.onmessage = async function(e) {
             break;
 
         case 'sync':
-            await syncToBlob(payload.data);
+            if (isSyncing) {
+                log('syncToBlob: already syncing, skipping');
+                return;
+            }
+            isSyncing = true;
+            try {
+                await syncToBlob(payload.data);
+            } finally {
+                isSyncing = false;
+            }
             break;
 
         case 'stop':
