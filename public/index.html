@@ -72,12 +72,21 @@
             font-size: 0.9em;
             margin-left: 0.5rem;
         }
-        .item-feed.clickable-feed {
-            cursor: pointer;
+        .item-feed a {
             color: #0078e4;
+            text-decoration: none;
         }
-        .item-feed.clickable-feed:hover {
+        .item-feed a:hover {
             text-decoration: underline;
+        }
+        .item-feed a.filter-feed-link {
+            cursor: pointer;
+        }
+        .item-feed a.mark-all-read-link {
+            color: #888;
+        }
+        .item-feed a.mark-all-read-link:hover {
+            color: #0078e4;
         }
         .item-content {
             color: #444;

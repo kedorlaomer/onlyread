@@ -25,6 +25,7 @@ const pageManage = document.getElementById('page-manage');
 let blobStore = null;
 let feedWorker = null;
 let hideRead = false;
+let filteredFeedTitle = null;
 
 const DEBUG = false;
 function log(...args) {
@@ -63,6 +64,14 @@ toggleReadBtn.addEventListener('click', () => {
     toggleReadBtn.textContent = hideRead ? 'Show Read' : 'Hide Read';
     renderItems();
 });
+
+function updateToggleFilterText() {
+    if (filteredFeedTitle) {
+        toggleReadBtn.title = `Showing items from: ${filteredFeedTitle}. Click feed title to clear filter.`;
+    } else {
+        toggleReadBtn.title = '';
+    }
+}
 
 const reloadBtn = document.getElementById('reload-btn');
 reloadBtn.addEventListener('click', () => {
@@ -227,6 +236,10 @@ function renderItems() {
         allItems = allItems.filter(item => item.unread !== false);
     }
     
+    if (filteredFeedTitle) {
+        allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
+    }
+    
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
         return;
@@ -271,7 +284,7 @@ function renderItems() {
             <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
-                    <span class="item-feed clickable-feed" data-feed-title="${feedTitle}">(${feedTitle})</span>
+                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${feedTitle}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${feedTitle}" title="Mark all items from this feed as read">Mark all as read</a>)</span>
                 </div>
                 <div class="item-title">
                     <a href="${item.link}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${item.link}">${titleHtml}</a>
@@ -550,24 +563,37 @@ itemsContainer.addEventListener('click', (e) => {
 });
 
 itemsContainer.addEventListener('click', (e) => {
-    const feedSpan = e.target.closest('span.clickable-feed');
-    if (feedSpan) {
-        const clickedFeedTitle = feedSpan.getAttribute('data-feed-title');
-        if (confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
-            const feeds = getFeeds(blobStore);
-            for (const feed of feeds) {
-                if ((feed.title || feed.url) === clickedFeedTitle || feed.link === clickedFeedTitle) {
-                    if (feed.items) {
-                        for (const item of feed.items) {
-                            item.unread = false;
-                        }
-                    }
-                    break;
-                }
-            }
-            blobStore.set('feeds', feeds);
-            renderItems();
+    const filterLink = e.target.closest('a.filter-feed-link');
+    if (filterLink) {
+        e.preventDefault();
+        const clickedFeedTitle = filterLink.getAttribute('data-feed-title');
+        if (filteredFeedTitle === clickedFeedTitle) {
+            filteredFeedTitle = null;
+        } else {
+            filteredFeedTitle = clickedFeedTitle;
         }
+        updateToggleFilterText();
+        renderItems();
+        return;
+    }
+
+    const markAllLink = e.target.closest('a.mark-all-read-link');
+    if (markAllLink) {
+        e.preventDefault();
+        const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if ((feed.title || feed.url) === clickedFeedTitle || feed.link === clickedFeedTitle) {
+                if (feed.items) {
+                    for (const item of feed.items) {
+                        item.unread = false;
+                    }
+                }
+                break;
+            }
+        }
+        blobStore.set('feeds', feeds);
+        renderItems();
     }
 });
 
