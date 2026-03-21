@@ -37,13 +37,17 @@ async function syncFromBlob() {
 }
 
 const BATCH_SIZE_BYTES = 1024 * 1024; // 1MB
+let syncVersion = 0;
 
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
+    syncVersion++;
+    const currentVersion = syncVersion;
+    
     const dataString = JSON.stringify(data);
     const dataSize = dataString.length;
-    log('syncToBlob called, data size:', dataSize, 'keys:', Object.keys(data));
+    log('syncToBlob called, data size:', dataSize, 'keys:', Object.keys(data), 'version:', currentVersion);
     
     const keys = Object.keys(data);
     let batchCount = 0;
@@ -61,13 +65,13 @@ async function syncToBlob(data) {
                 
                 if (currentBatchSize + feedSize > BATCH_SIZE_BYTES && currentBatch.length > 0) {
                     batchCount++;
-                    log('syncToBlob: sending batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
+                    log('syncToBlob: sending batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length, 'version:', currentVersion);
                     
                     try {
                         const response = await fetch(`/.netlify/functions/store/${userId}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ partial: true, data: { feeds: currentBatch } })
+                            body: JSON.stringify({ partial: true, version: currentVersion, data: { feeds: currentBatch } })
                         });
                         
                         if (!response.ok) {
@@ -89,13 +93,13 @@ async function syncToBlob(data) {
             // Send remaining feeds
             if (currentBatch.length > 0) {
                 batchCount++;
-                log('syncToBlob: sending final batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
+                log('syncToBlob: sending final batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length, 'version:', currentVersion);
                 
                 try {
                     const response = await fetch(`/.netlify/functions/store/${userId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ partial: true, data: { feeds: currentBatch } })
+                        body: JSON.stringify({ partial: true, version: currentVersion, data: { feeds: currentBatch } })
                     });
                     
                     if (!response.ok) {
@@ -109,13 +113,13 @@ async function syncToBlob(data) {
         } else {
             // Non-feeds data: send as-is (usually small)
             batchCount++;
-            log('syncToBlob: sending', key, 'size:', JSON.stringify(value).length);
+            log('syncToBlob: sending', key, 'size:', JSON.stringify(value).length, 'version:', currentVersion);
             
             try {
                 const response = await fetch(`/.netlify/functions/store/${userId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ partial: true, data: { [key]: value } })
+                    body: JSON.stringify({ partial: true, version: currentVersion, data: { [key]: value } })
                 });
                 
                 if (!response.ok) {
@@ -128,7 +132,7 @@ async function syncToBlob(data) {
         }
     }
     
-    log('syncToBlob: complete,', batchCount, 'batches sent');
+    log('syncToBlob: complete,', batchCount, 'batches sent, version:', currentVersion);
     self.postMessage({ type: 'synced' });
 }
 

@@ -64,37 +64,43 @@ exports.handler = async (event, context) => {
             }
             
             try {
-                let existingData = {};
+                let existingData = { feeds: [] };
+                let existingVersion = 0;
+                
                 try {
                     const raw = await store.get(userId);
                     if (raw) {
-                        existingData = JSON.parse(raw);
+                        const parsed = JSON.parse(raw);
+                        existingData = { feeds: parsed.feeds || [] };
+                        existingVersion = parsed._version || 0;
                     }
                 } catch (e) {
                     // No existing data
                 }
                 
+                // Check version - if incoming version <= stored version, skip
+                if (data.version && data.version <= existingVersion) {
+                    log('Skipping stale update: incoming version', data.version, '<= stored version', existingVersion);
+                    return send(200, { success: true, skipped: true });
+                }
+                
+                let merged = { feeds: existingData.feeds || [] };
+                
                 if (data.partial && data.data) {
-                    // Merge partial data
-                    const merged = { ...existingData };
-                    
                     for (const [key, value] of Object.entries(data.data)) {
                         if (key === 'feeds' && Array.isArray(value)) {
-                            // Append feeds arrays together
-                            if (!Array.isArray(merged.feeds)) {
-                                merged.feeds = [];
-                            }
                             merged.feeds = [...merged.feeds, ...value];
                         } else {
                             merged[key] = value;
                         }
                     }
-                    
-                    await store.setJSON(userId, merged);
-                } else {
-                    await store.setJSON(userId, data);
                 }
-                return send(200, { success: true });
+                
+                // Store with version
+                merged._version = data.version || 1;
+                
+                await store.setJSON(userId, merged);
+                return send(200, { success: true, version: merged._version });
             } catch (e) {
                 return send(500, { error: e.message });
             }
