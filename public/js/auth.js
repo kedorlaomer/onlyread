@@ -27,7 +27,7 @@ let feedWorker = null;
 let hideRead = false;
 let filteredFeedTitle = null;
 
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -556,6 +556,7 @@ itemsContainer.addEventListener('click', (e) => {
                     if (item.link === itemLink && item.unread) {
                     item.unread = false;
                     blobStore.set('feeds', feeds);
+                    blobStore.syncNow();
                     renderItems();
                     break;
                 }
@@ -587,12 +588,9 @@ itemsContainer.addEventListener('click', (e) => {
             return;
         }
         const feeds = getFeeds(blobStore);
-        console.log('[Auth] Mark all read for:', clickedFeedTitle);
-        console.log('[Auth] Feeds available:', feeds.map(f => ({ title: f.title, url: f.url })));
         let found = false;
         for (const feed of feeds) {
             const matchKey = feed.title || feed.url;
-            console.log('[Auth] Checking:', matchKey, '===', clickedFeedTitle, ':', matchKey === clickedFeedTitle);
             if (matchKey === clickedFeedTitle) {
                 if (feed.items) {
                     for (const item of feed.items) {
@@ -603,9 +601,9 @@ itemsContainer.addEventListener('click', (e) => {
                 break;
             }
         }
-        console.log('[Auth] Found:', found);
         if (found) {
             blobStore.set('feeds', feeds);
+            blobStore.syncNow();
             renderItems();
         }
     }
@@ -621,6 +619,7 @@ itemsContainer.addEventListener('click', (e) => {
                 if (item.link === clickedItemLink) {
                     item.unread = true;
                     blobStore.set('feeds', feeds);
+                    blobStore.syncNow();
                     renderItems();
                     return;
                 }
