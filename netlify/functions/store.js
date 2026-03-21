@@ -104,13 +104,17 @@ exports.handler = async (event, context) => {
                                 incomingFeed.items = [];
                             }
                             
-                            // Create set of existing item links
-                            const existingLinks = new Set(existingFeed.items.map(item => item.link));
+                            // Create set of existing item IDs (prefer guid, fall back to link)
+                            const existingIds = new Set(
+                                existingFeed.items.map(item => item.guid || item.link)
+                            );
                             
                             // Add only new items
                             for (const item of incomingFeed.items) {
-                                if (item.link && !existingLinks.has(item.link)) {
+                                const itemId = item.guid || item.link;
+                                if (itemId && !existingIds.has(itemId)) {
                                     existingFeed.items.push(item);
+                                    existingIds.add(itemId);
                                 }
                             }
                         }
