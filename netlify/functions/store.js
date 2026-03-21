@@ -64,43 +64,62 @@ exports.handler = async (event, context) => {
             }
             
             try {
-                let existingData = { feeds: [] };
-                let existingVersion = 0;
-                
+                // Get existing feeds
+                let existingFeeds = [];
                 try {
                     const raw = await store.get(userId);
                     if (raw) {
                         const parsed = JSON.parse(raw);
-                        existingData = { feeds: parsed.feeds || [] };
-                        existingVersion = parsed._version || 0;
+                        existingFeeds = parsed.feeds || [];
                     }
                 } catch (e) {
                     // No existing data
                 }
                 
-                // Check version - if incoming version <= stored version, skip
-                if (data.version && data.version <= existingVersion) {
-                    log('Skipping stale update: incoming version', data.version, '<= stored version', existingVersion);
-                    return send(200, { success: true, skipped: true });
+                // Build a map of existing feeds by URL for quick lookup
+                const existingFeedMap = new Map();
+                for (const feed of existingFeeds) {
+                    if (feed.url) {
+                        existingFeedMap.set(feed.url, feed);
+                    }
                 }
                 
-                let merged = { feeds: existingData.feeds || [] };
-                
-                if (data.partial && data.data) {
-                    for (const [key, value] of Object.entries(data.data)) {
-                        if (key === 'feeds' && Array.isArray(value)) {
-                            merged.feeds = [...merged.feeds, ...value];
+                // Process incoming feeds
+                if (data.feeds && Array.isArray(data.feeds)) {
+                    for (const incomingFeed of data.feeds) {
+                        if (!incomingFeed.url) continue;
+                        
+                        const existingFeed = existingFeedMap.get(incomingFeed.url);
+                        
+                        if (!existingFeed) {
+                            // Feed doesn't exist - add it
+                            existingFeeds.push(incomingFeed);
+                            existingFeedMap.set(incomingFeed.url, incomingFeed);
                         } else {
-                            merged[key] = value;
+                            // Feed exists - merge items
+                            if (!existingFeed.items) {
+                                existingFeed.items = [];
+                            }
+                            if (!incomingFeed.items) {
+                                incomingFeed.items = [];
+                            }
+                            
+                            // Create set of existing item links
+                            const existingLinks = new Set(existingFeed.items.map(item => item.link));
+                            
+                            // Add only new items
+                            for (const item of incomingFeed.items) {
+                                if (item.link && !existingLinks.has(item.link)) {
+                                    existingFeed.items.push(item);
+                                }
+                            }
                         }
                     }
                 }
                 
-                // Store with version
-                merged._version = data.version || 1;
-                
-                await store.setJSON(userId, merged);
-                return send(200, { success: true, version: merged._version });
+                // Save merged feeds
+                await store.setJSON(userId, { feeds: existingFeeds });
+                return send(200, { success: true, feedCount: existingFeeds.length });
             } catch (e) {
                 return send(500, { error: e.message });
             }
