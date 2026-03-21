@@ -46,10 +46,27 @@ exports.handler = async (event, context) => {
                         data = { _raw: raw };
                     }
                 }
+                
+                // Handle pagination
+                const offset = parseInt(event.queryStringParameters?.offset) || 0;
+                const limit = parseInt(event.queryStringParameters?.limit) || 50;
+                
+                if (data.feeds && Array.isArray(data.feeds)) {
+                    const total = data.feeds.length;
+                    const paginatedFeeds = data.feeds.slice(offset, offset + limit);
+                    return send(200, {
+                        feeds: paginatedFeeds,
+                        total,
+                        offset,
+                        limit,
+                        hasMore: offset + limit < total
+                    });
+                }
+                
                 return send(200, data);
             } catch (e) {
                 if (e.message.includes('not exist') || e.message.includes('404')) {
-                    return send(200, {});
+                    return send(200, { feeds: [], total: 0, offset: 0, limit: 50, hasMore: false });
                 }
                 return send(500, { error: e.message });
             }

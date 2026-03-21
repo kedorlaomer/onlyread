@@ -26,14 +26,36 @@ async function syncFromBlob() {
     if (!userId || !blobAvailable) return;
 
     try {
-        const response = await fetch(`/.netlify/functions/store/${userId}`);
-        if (response.status === 404) return;
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (data && Object.keys(data).length > 0) {
-            self.postMessage({ type: 'syncFromBlob', data });
+        let allFeeds = [];
+        let offset = 0;
+        const limit = 50;
+        let hasMore = true;
+        
+        // Fetch feeds in pages
+        while (hasMore) {
+            const response = await fetch(`/.netlify/functions/store/${userId}?offset=${offset}&limit=${limit}`);
+            if (response.status === 404) return;
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            
+            if (data.feeds && Array.isArray(data.feeds)) {
+                allFeeds = allFeeds.concat(data.feeds);
+                hasMore = data.hasMore;
+                offset += limit;
+                log('syncFromBlob: fetched page, offset:', offset, 'total:', data.total);
+            } else {
+                hasMore = false;
+            }
         }
-    } catch (e) {}
+        
+        if (allFeeds.length > 0) {
+            log('syncFromBlob: loaded', allFeeds.length, 'feeds');
+            self.postMessage({ type: 'syncFromBlob', data: { feeds: allFeeds } });
+        }
+    } catch (e) {
+        log('syncFromBlob error:', e.message);
+    }
 }
 
 const BATCH_SIZE_BYTES = 1024 * 1024; // 1MB
