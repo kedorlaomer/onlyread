@@ -581,13 +581,13 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
-        console.log('[Auth] Mark all read for:', clickedFeedTitle);
+        if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
+            return;
+        }
         const feeds = getFeeds(blobStore);
-        console.log('[Auth] All feeds:', feeds.map(f => ({ title: f.title, url: f.url, link: f.link, itemCount: f.items?.length })));
         let found = false;
         for (const feed of feeds) {
             const matchKey = feed.title || feed.url;
-            console.log('[Auth] Comparing:', matchKey, '===', clickedFeedTitle, ':', matchKey === clickedFeedTitle);
             if (matchKey === clickedFeedTitle) {
                 if (feed.items) {
                     for (const item of feed.items) {
@@ -598,9 +598,10 @@ itemsContainer.addEventListener('click', (e) => {
                 break;
             }
         }
-        console.log('[Auth] Found and updated:', found);
-        blobStore.set('feeds', feeds);
-        renderItems();
+        if (found) {
+            blobStore.set('feeds', feeds);
+            renderItems();
+        }
     }
 });
 
