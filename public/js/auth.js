@@ -271,7 +271,7 @@ function renderItems() {
             <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
-                    <span class="item-feed">(${feedTitle})</span>
+                    <span class="item-feed clickable-feed" data-feed-title="${feedTitle}">(${feedTitle})</span>
                 </div>
                 <div class="item-title">
                     <a href="${item.link}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${item.link}">${titleHtml}</a>
@@ -538,13 +538,35 @@ itemsContainer.addEventListener('click', (e) => {
         for (const feed of feeds) {
             if (!feed.items) continue;
             for (const item of feed.items) {
-                if (item.link === itemLink && item.unread) {
+                    if (item.link === itemLink && item.unread) {
                     item.unread = false;
                     blobStore.set('feeds', feeds);
-                    blobStore.scheduleSync();
+                    renderItems();
                     break;
                 }
             }
+        }
+    }
+});
+
+itemsContainer.addEventListener('click', (e) => {
+    const feedSpan = e.target.closest('span.clickable-feed');
+    if (feedSpan) {
+        const clickedFeedTitle = feedSpan.getAttribute('data-feed-title');
+        if (confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
+            const feeds = getFeeds(blobStore);
+            for (const feed of feeds) {
+                if ((feed.title || feed.url) === clickedFeedTitle || feed.link === clickedFeedTitle) {
+                    if (feed.items) {
+                        for (const item of feed.items) {
+                            item.unread = false;
+                        }
+                    }
+                    break;
+                }
+            }
+            blobStore.set('feeds', feeds);
+            renderItems();
         }
     }
 });
