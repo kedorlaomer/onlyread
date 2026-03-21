@@ -280,11 +280,13 @@ function renderItems() {
             titleHtml = feedTitle;
         }
         
+        const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
+        
         return `
             <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
-                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${feedTitle}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${feedTitle}" title="Mark all items from this feed as read">Mark all as read</a>)</span>
+                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${feedTitle}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${feedTitle}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
                 </div>
                 <div class="item-title">
                     <a href="${item.link}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${item.link}">${titleHtml}</a>
@@ -601,6 +603,24 @@ itemsContainer.addEventListener('click', (e) => {
         if (found) {
             blobStore.set('feeds', feeds);
             renderItems();
+        }
+    }
+
+    const markUnreadLink = e.target.closest('a.mark-unread-link');
+    if (markUnreadLink) {
+        e.preventDefault();
+        const clickedItemLink = markUnreadLink.getAttribute('data-item-link');
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if (!feed.items) continue;
+            for (const item of feed.items) {
+                if (item.link === clickedItemLink) {
+                    item.unread = true;
+                    blobStore.set('feeds', feeds);
+                    renderItems();
+                    return;
+                }
+            }
         }
     }
 });
