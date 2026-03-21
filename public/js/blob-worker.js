@@ -75,14 +75,12 @@ async function syncToBlob(data) {
         const value = data[key];
         
         if (key === 'feeds' && Array.isArray(value)) {
-            // Split feeds array into ~1MB chunks, sending each feed individually
             let currentBatch = [];
             let currentBatchSize = 0;
             
             for (const feed of value) {
                 const feedSize = JSON.stringify(feed).length;
                 
-                // If adding this feed would exceed 1MB and we have items, send current batch
                 if (currentBatchSize + feedSize > BATCH_SIZE_BYTES && currentBatch.length > 0) {
                     batchCount++;
                     log('syncToBlob: sending batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
@@ -106,12 +104,10 @@ async function syncToBlob(data) {
                     currentBatchSize = 0;
                 }
                 
-                // Add feed to current batch
                 currentBatch.push(feed);
                 currentBatchSize += feedSize;
             }
             
-            // Send remaining feeds
             if (currentBatch.length > 0) {
                 batchCount++;
                 log('syncToBlob: sending final batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
@@ -132,7 +128,6 @@ async function syncToBlob(data) {
                 }
             }
         } else {
-            // Non-feeds data: send as-is
             log('syncToBlob: sending', key);
             
             try {

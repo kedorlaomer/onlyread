@@ -555,13 +555,13 @@ itemsContainer.addEventListener('click', (e) => {
             for (const item of feed.items) {
                     if (item.link === itemLink && item.unread) {
                     item.unread = false;
-                    blobStore.set('feeds', feeds);
-                    blobStore.syncNow();
-                    renderItems();
                     break;
                 }
             }
         }
+        blobStore.set('feeds', feeds);
+        blobStore.syncNow();
+        renderItems();
     }
 });
 
@@ -618,13 +618,13 @@ itemsContainer.addEventListener('click', (e) => {
             for (const item of feed.items) {
                 if (item.link === clickedItemLink) {
                     item.unread = true;
-                    blobStore.set('feeds', feeds);
-                    blobStore.syncNow();
-                    renderItems();
-                    return;
+                    break;
                 }
             }
         }
+        blobStore.set('feeds', feeds);
+        blobStore.syncNow();
+        renderItems();
     }
 });
 

@@ -88,7 +88,6 @@ function dbGetAllForUser(userId) {
             }
         }
         
-        // Get all keys
         const keyRequest = store.getAllKeys();
         keyRequest.onsuccess = () => {
             const prefix = `blob_${userId}_`;
@@ -164,7 +163,6 @@ export function createBlobStore() {
             try {
                 await openDB();
                 log('IndexedDB opened, loading data...');
-                // Load existing data from IndexedDB into memoryCache
                 const allData = await dbGetAllForUser(userId);
                 log('Loaded from IndexedDB:', Object.keys(allData));
                 for (const [key, value] of Object.entries(allData)) {
@@ -240,7 +238,6 @@ export function createBlobStore() {
             memoryCache[storageKey] = value;
             log('set() called for key:', key, 'cache size:', JSON.stringify(memoryCache).length);
             
-            // Debounce sync
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
                 const keysToSync = Object.keys(memoryCache)
