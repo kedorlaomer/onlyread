@@ -27,7 +27,7 @@ let feedWorker = null;
 let hideRead = false;
 let filteredFeedTitle = null;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -581,17 +581,24 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
+        console.log('[Auth] Mark all read for:', clickedFeedTitle);
         const feeds = getFeeds(blobStore);
+        console.log('[Auth] All feeds:', feeds.map(f => ({ title: f.title, url: f.url, link: f.link, itemCount: f.items?.length })));
+        let found = false;
         for (const feed of feeds) {
-            if ((feed.title || feed.url) === clickedFeedTitle || feed.link === clickedFeedTitle) {
+            const matchKey = feed.title || feed.url;
+            console.log('[Auth] Comparing:', matchKey, '===', clickedFeedTitle, ':', matchKey === clickedFeedTitle);
+            if (matchKey === clickedFeedTitle) {
                 if (feed.items) {
                     for (const item of feed.items) {
                         item.unread = false;
                     }
                 }
+                found = true;
                 break;
             }
         }
+        console.log('[Auth] Found and updated:', found);
         blobStore.set('feeds', feeds);
         renderItems();
     }
