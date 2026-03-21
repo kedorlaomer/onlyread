@@ -73,9 +73,9 @@ function updateToggleFilterText() {
     }
 }
 
-const reloadBtn = document.getElementById('reload-btn');
-reloadBtn.addEventListener('click', () => {
-    triggerFeedScan();
+const syncBtn = document.getElementById('sync-btn');
+syncBtn.addEventListener('click', () => {
+    blobStore.syncNow();
 });
 
 function decodeJWT(token) {
