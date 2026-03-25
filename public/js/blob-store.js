@@ -298,32 +298,15 @@ export function createBlobStore() {
         },
 
         async markFeedAsRead(feedUrl) {
-            console.log('[BlobStore] markFeedAsRead START, feedUrl:', feedUrl);
-            console.log('[BlobStore] currentUserId:', currentUserId);
-            if (!currentUserId) {
-                console.log('[BlobStore] No currentUserId, returning');
-                return;
-            }
+            if (!currentUserId) return;
             const prefix = `blob_${currentUserId}_`;
             const feedsKey = `${prefix}feeds`;
             const feeds = memoryCache[feedsKey];
-            console.log('[BlobStore] feeds:', feeds ? `${feeds.length} items` : 'null/undefined');
-            if (!feeds || !Array.isArray(feeds)) {
-                console.log('[BlobStore] Not array or null, returning');
-                return;
-            }
+            if (!feeds || !Array.isArray(feeds)) return;
 
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
-            console.log('[BlobStore] feedIndex:', feedIndex);
-            if (feedIndex === -1) {
-                console.log('[BlobStore] Feed not found by URL, trying title');
-                // Try finding by title instead
-                const feedByTitle = feeds.find(f => f.title === feedUrl);
-                console.log('[BlobStore] feedByTitle:', feedByTitle);
-                return;
-            }
+            if (feedIndex === -1) return;
 
-            console.log('[BlobStore] Feed found, items:', feeds[feedIndex].items?.length);
             // Always mark all items as read in local cache
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
@@ -331,17 +314,14 @@ export function createBlobStore() {
                 }
             }
             
-            console.log('[BlobStore] Writing to IndexedDB...');
             memoryCache[feedsKey] = feeds;
             await dbSet(feedsKey, feeds);
-            console.log('[BlobStore] IndexedDB written, posting to worker');
             if (worker) {
                 worker.postMessage({
                     type: 'markAllRead',
                     payload: { feedUrl }
                 });
             }
-            console.log('[BlobStore] markFeedAsRead DONE');
         }
     };
 }
