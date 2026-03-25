@@ -164,6 +164,12 @@ function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+function stripHtml(html) {
+    if (!html) return '';
+    
+    // Keep only b, i, u, a, em, strong tags and their content
+    let result = html;
     
     // Replace <br> and </p> with newlines
     result = result.replace(/<br\s*\/?>/gi, '\n');
@@ -185,6 +191,7 @@ function escapeHtml(str) {
     result = result.trim();
     
     return result;
+}
 }
 
 function getItemId(item) {
