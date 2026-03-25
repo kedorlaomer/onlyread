@@ -214,6 +214,10 @@ function markItemAsRead(item, blobStore) {
 function renderItems() {
     if (!blobStore) return;
     const feeds = getFeeds(blobStore);
+    console.log('[Auth] renderItems: getFeeds returned', feeds.length, 'feeds');
+    // Find the specific feed to check its items
+    const testFeed = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
+    console.log('[Auth] renderItems: Jan-Lukas Else items:', testFeed?.items?.map(i => ({ link: i.link, unread: i.unread })));
     
     let allItems = [];
     for (const feed of feeds) {
