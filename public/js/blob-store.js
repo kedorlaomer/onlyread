@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 function log(...args) {
     if (DEBUG) console.log('[BlobStore]', ...args);
 }
@@ -319,27 +319,21 @@ export function createBlobStore() {
                 return;
             }
 
-            let hasChanges = false;
+            // Always mark all items as read in local cache to ensure UI updates
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
-                    if (item.unread !== false) {
-                        item.unread = false;
-                        hasChanges = true;
-                    }
+                    item.unread = false;
                 }
             }
-            console.log('[BlobStore] hasChanges:', hasChanges);
-
-            if (hasChanges) {
-                memoryCache[feedsKey] = feeds;
-                await dbSet(feedsKey, feeds);
-                console.log('[BlobStore] Calling worker postMessage');
-                if (worker) {
-                    worker.postMessage({
-                        type: 'markAllRead',
-                        payload: { feedUrl }
-                    });
-                }
+            
+            memoryCache[feedsKey] = feeds;
+            await dbSet(feedsKey, feeds);
+            console.log('[BlobStore] Calling worker postMessage');
+            if (worker) {
+                worker.postMessage({
+                    type: 'markAllRead',
+                    payload: { feedUrl }
+                });
             }
         }
     };
