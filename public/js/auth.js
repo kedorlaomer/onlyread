@@ -227,10 +227,6 @@ function renderItems() {
         }
     }
     
-    console.log('[Auth] renderItems allItems count:', allItems.length);
-    const janLukasItems = allItems.filter(i => i.feedTitle === 'Jan-Lukas Else');
-    console.log('[Auth] Jan-Lukas Else items in allItems:', janLukasItems.map(i => i.unread));
-    
     // Sort by pubDate descending
     allItems.sort((a, b) => {
         const dateA = parseRfc822Date(a.pubDate);
@@ -290,6 +286,8 @@ function renderItems() {
         }
         
         const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
+        
+        console.log('[Auth] Rendering item, unread:', item.unread, 'unread===false:', item.unread === false, 'class will be:', item.unread === false ? ' read' : '');
         
         return `
             <div class="item${item.unread === false ? ' read' : ''}">
@@ -601,12 +599,6 @@ itemsContainer.addEventListener('click', (e) => {
         if (feed) {
             blobStore.markFeedAsRead(feed.url);
             renderItems();
-            console.log('[Auth] renderItems called, checking result:');
-            setTimeout(() => {
-                const feedsAfter = getFeeds(blobStore);
-                const testFeedAfter = feedsAfter.find(f => f.url === feed.url);
-                console.log('[Auth] Final items:', testFeedAfter?.items?.slice(0,2).map(i => ({ unread: i.unread })));
-            }, 500);
         }
     }
 
