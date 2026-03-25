@@ -20,15 +20,46 @@ async function fetchFeedBatch(feedUrls) {
     log('Fetching batch:', feedUrls.length, 'feeds');
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(feedUrls))}`;
-        const response = await fetch(proxyUrl);
-        log('Fetch response:', response.status);
         
-        // Check for size error by inspecting response status or trying to parse
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '');
-            log('Error response text:', errorText.substring(0, 200));
-            if (errorText.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
-                log('Response too large, retrying one by one');
+        let response;
+        let data = null;
+        let responseText = '';
+        
+        try {
+            response = await fetch(proxyUrl);
+            log('Fetch response status:', response.status);
+            
+            // Try to get text first (to detect size errors)
+            responseText = await response.text();
+            log('Response text length:', responseText.length);
+            
+            // Check if response text indicates size error
+            if (responseText.includes('ResponseSizeTooLarge')) {
+                log('Detected ResponseSizeTooLarge in response text');
+                if (feedUrls.length > 1) {
+                    log('Retrying one by one');
+                    const results = [];
+                    for (const url of feedUrls) {
+                        const singleResult = await fetchFeedBatch([url]);
+                        results.push(...singleResult);
+                    }
+                    return results;
+                }
+                return [];
+            }
+            
+            // Try to parse as JSON
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                log('Response is not JSON');
+            }
+            
+        } catch (fetchError) {
+            log('Fetch error:', fetchError.message);
+            // Network error or response too large to parse
+            if (feedUrls.length > 1) {
+                log('Fetch failed, retrying one by one');
                 const results = [];
                 for (const url of feedUrls) {
                     const singleResult = await fetchFeedBatch([url]);
@@ -39,12 +70,10 @@ async function fetchFeedBatch(feedUrls) {
             return [];
         }
         
-        const data = await response.json();
-        
-        // Check for size error in JSON response (errorType + errorMessage format)
+        // Check JSON for error
         const errorStr = data?.errorType || data?.errorMessage || '';
         if (errorStr.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
-            log('Response too large (from JSON), retrying one by one');
+            log('Detected ResponseSizeTooLarge in JSON, retrying one by one');
             const results = [];
             for (const url of feedUrls) {
                 const singleResult = await fetchFeedBatch([url]);
@@ -53,17 +82,21 @@ async function fetchFeedBatch(feedUrls) {
             return results;
         }
         
-        if (data.results) {
+        if (!response.ok) {
+            return [];
+        }
+        
+        if (data?.results) {
             return data.results
                 .filter(r => r.text)
                 .map(r => ({ feedUrl: r.url, text: r.text }));
         }
-        if (data.text) {
+        if (data?.text) {
             return [{ feedUrl: data.url, text: data.text }];
         }
         return [];
     } catch (e) {
-        log('Fetch error:', e);
+        log('Outer catch error:', e);
         return [];
     }
 }
