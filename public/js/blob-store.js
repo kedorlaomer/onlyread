@@ -298,28 +298,16 @@ export function createBlobStore() {
         },
 
         async markFeedAsRead(feedUrl) {
-            console.log('[BlobStore] markFeedAsRead called with:', feedUrl);
-            if (!currentUserId) {
-                console.log('[BlobStore] No currentUserId, returning');
-                return;
-            }
+            if (!currentUserId) return;
             const prefix = `blob_${currentUserId}_`;
             const feedsKey = `${prefix}feeds`;
             const feeds = memoryCache[feedsKey];
-            console.log('[BlobStore] feeds from cache:', feeds ? `${feeds.length} feeds` : 'null/undefined');
-            if (!feeds || !Array.isArray(feeds)) {
-                console.log('[BlobStore] No feeds array, returning');
-                return;
-            }
+            if (!feeds || !Array.isArray(feeds)) return;
 
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
-            console.log('[BlobStore] feedIndex:', feedIndex);
-            if (feedIndex === -1) {
-                console.log('[BlobStore] Feed not found in cache, returning');
-                return;
-            }
+            if (feedIndex === -1) return;
 
-            // Always mark all items as read in local cache to ensure UI updates
+            // Always mark all items as read in local cache
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
                     item.unread = false;
@@ -328,7 +316,6 @@ export function createBlobStore() {
             
             memoryCache[feedsKey] = feeds;
             await dbSet(feedsKey, feeds);
-            console.log('[BlobStore] Calling worker postMessage');
             if (worker) {
                 worker.postMessage({
                     type: 'markAllRead',
