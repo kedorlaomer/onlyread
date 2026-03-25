@@ -167,7 +167,6 @@ function stopSync() {
 
 self.onmessage = async function(e) {
     const { type, payload } = e.data;
-    log('[BlobWorker] onmessage:', type, 'payload:', payload);
 
     switch (type) {
         case 'init':
