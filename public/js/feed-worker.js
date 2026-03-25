@@ -23,8 +23,10 @@ async function fetchFeedBatch(feedUrls) {
         const response = await fetch(proxyUrl);
         log('Fetch response:', response.status);
         
+        // Check for size error by inspecting response status or trying to parse
         if (!response.ok) {
             const errorText = await response.text().catch(() => '');
+            log('Error response text:', errorText.substring(0, 200));
             if (errorText.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
                 log('Response too large, retrying one by one');
                 const results = [];
@@ -38,7 +40,10 @@ async function fetchFeedBatch(feedUrls) {
         }
         
         const data = await response.json();
-        if (data.error && data.error.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
+        
+        // Check for size error in JSON response (errorType + errorMessage format)
+        const errorStr = data?.errorType || data?.errorMessage || '';
+        if (errorStr.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
             log('Response too large (from JSON), retrying one by one');
             const results = [];
             for (const url of feedUrls) {
@@ -47,6 +52,7 @@ async function fetchFeedBatch(feedUrls) {
             }
             return results;
         }
+        
         if (data.results) {
             return data.results
                 .filter(r => r.text)
