@@ -1,6 +1,6 @@
 let userId = null;
 let syncInterval = null;
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 2000;
 
 const DEBUG = false;
@@ -26,26 +26,22 @@ async function fetchFeedBatch(feedUrls) {
         if (!response.ok) {
             const errorText = await response.text().catch(() => '');
             if (errorText.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
-                log('Response too large, retrying element by element');
-                const results = [];
-                for (const url of feedUrls) {
-                    const singleResult = await fetchFeedBatch([url]);
-                    results.push(...singleResult);
-                }
-                return results;
+                log('Response too large, retrying with smaller batch');
+                const mid = Math.floor(feedUrls.length / 2);
+                const results1 = await fetchFeedBatch(feedUrls.slice(0, mid));
+                const results2 = await fetchFeedBatch(feedUrls.slice(mid));
+                return [...results1, ...results2];
             }
             return [];
         }
         
         const data = await response.json();
         if (data.error && data.error.includes('ResponseSizeTooLarge') && feedUrls.length > 1) {
-            log('Response too large (from JSON), retrying element by element');
-            const results = [];
-            for (const url of feedUrls) {
-                const singleResult = await fetchFeedBatch([url]);
-                results.push(...singleResult);
-            }
-            return results;
+            log('Response too large (from JSON), retrying with smaller batch');
+            const mid = Math.floor(feedUrls.length / 2);
+            const results1 = await fetchFeedBatch(feedUrls.slice(0, mid));
+            const results2 = await fetchFeedBatch(feedUrls.slice(mid));
+            return [...results1, ...results2];
         }
         if (data.results) {
             return data.results
