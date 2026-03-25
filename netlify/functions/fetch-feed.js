@@ -12,6 +12,7 @@ try {
 }
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_TEXT_SIZE = 4 * 1024 * 1024; // 4MB limit to leave room for overhead
 
 function makeCacheKey(url) {
     // Simple hash: URL-encoded, with special chars replaced
@@ -76,7 +77,13 @@ exports.handler = async (event, context) => {
             const text = await response.text();
             const contentType = response.headers.get('content-type') || '';
 
-            const result = { text, contentType };
+            // Truncate if too large
+            let truncatedText = text;
+            if (text.length > MAX_TEXT_SIZE) {
+                truncatedText = text.substring(0, MAX_TEXT_SIZE) + '\n\n[...truncated due to size]';
+            }
+
+            const result = { text: truncatedText, contentType };
 
             // Store in cache
             if (cacheStore) {
