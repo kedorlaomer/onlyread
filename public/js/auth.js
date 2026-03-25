@@ -214,10 +214,6 @@ function markItemAsRead(item, blobStore) {
 function renderItems() {
     if (!blobStore) return;
     const feeds = getFeeds(blobStore);
-    console.log('[Auth] renderItems: getFeeds returned', feeds.length, 'feeds');
-    // Find the specific feed to check its items
-    const testFeed = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('[Auth] renderItems: Jan-Lukas Else items:', testFeed?.items?.map(i => ({ link: i.link, unread: i.unread })));
     
     let allItems = [];
     for (const feed of feeds) {
@@ -593,13 +589,21 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
+        console.log('[Auth] Clicked feed title:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
+        console.log('[Auth] Looking for feed with title/url:', clickedFeedTitle);
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
+        console.log('[Auth] Found feed:', feed ? 'YES' : 'NO', feed?.url);
         if (feed) {
+            console.log('[Auth] Calling markFeedAsRead for:', feed.url);
             blobStore.markFeedAsRead(feed.url);
+            console.log('[Auth] After markFeedAsRead, checking feeds:');
+            const feedsAfter = getFeeds(blobStore);
+            const testFeedAfter = feedsAfter.find(f => f.url === feed.url);
+            console.log('[Auth] Items after:', testFeedAfter?.items?.map(i => i.unread));
             renderItems();
         }
     }
