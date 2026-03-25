@@ -213,20 +213,10 @@ function markItemAsRead(item, blobStore) {
 
 function renderItems() {
     if (!blobStore) return;
-    
-    // Force fresh fetch from memory cache
-    const feeds = blobStore.get('feeds');
-    console.log('[Auth] renderItems feeds from blobStore.get:', feeds?.length);
-    
-    // Check a specific feed
-    const janLukasFeed = feeds?.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('[Auth] renderItems Jan-Lukas feed items:', janLukasFeed?.items?.map(i => i.unread));
-    
-    // Convert to array if needed (since getFeeds expects array)
-    const feedsArray = Array.isArray(feeds) ? feeds : [];
+    const feeds = getFeeds(blobStore);
     
     let allItems = [];
-    for (const feed of feedsArray) {
+    for (const feed of feeds) {
         if (!feed.items) continue;
         for (const item of feed.items) {
             allItems.push({
