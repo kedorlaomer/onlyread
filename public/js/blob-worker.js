@@ -191,6 +191,23 @@ self.onmessage = async function(e) {
             }
             break;
 
+        case 'markAllRead':
+            if (!userId || !blobAvailable) return;
+            try {
+                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'markAllRead' })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    log('markAllRead error:', text);
+                }
+            } catch (e) {
+                log('markAllRead failed:', e.message);
+            }
+            break;
+
         case 'stop':
             stopSync();
             self.postMessage({ type: 'stopped' });

@@ -295,6 +295,38 @@ export function createBlobStore() {
             }
             ready = false;
             currentUserId = null;
+        },
+
+        async markFeedAsRead(feedUrl) {
+            if (!currentUserId) return;
+            const prefix = `blob_${currentUserId}_`;
+            const feedsKey = `${prefix}feeds`;
+            const feeds = memoryCache[feedsKey];
+            if (!feeds || !Array.isArray(feeds)) return;
+
+            const feedIndex = feeds.findIndex(f => f.url === feedUrl);
+            if (feedIndex === -1) return;
+
+            let hasChanges = false;
+            if (feeds[feedIndex].items) {
+                for (const item of feeds[feedIndex].items) {
+                    if (item.unread !== false) {
+                        item.unread = false;
+                        hasChanges = true;
+                    }
+                }
+            }
+
+            if (hasChanges) {
+                memoryCache[feedsKey] = feeds;
+                await dbSet(feedsKey, feeds);
+                if (worker) {
+                    worker.postMessage({
+                        type: 'markAllRead',
+                        payload: { feedUrl }
+                    });
+                }
+            }
         }
     };
 }

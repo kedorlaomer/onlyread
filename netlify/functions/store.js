@@ -79,7 +79,43 @@ exports.handler = async (event, context) => {
             } catch (e) {
                 return send(400, { error: 'Invalid JSON' });
             }
-            
+
+            const feedUrl = event.queryStringParameters?.feedUrl;
+
+            if (feedUrl && data.action) {
+                try {
+                    let existingFeeds = [];
+                    try {
+                        const raw = await store.get(userId);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            existingFeeds = parsed.feeds || [];
+                        }
+                    } catch (e) {
+                        return send(404, { error: 'No existing data found' });
+                    }
+
+                    const feedIndex = existingFeeds.findIndex(f => f.url === feedUrl);
+                    if (feedIndex === -1) {
+                        return send(404, { error: 'Feed not found' });
+                    }
+
+                    if (data.action === 'markAllRead') {
+                        if (existingFeeds[feedIndex].items) {
+                            for (const item of existingFeeds[feedIndex].items) {
+                                item.unread = false;
+                            }
+                        }
+                        await store.setJSON(userId, { feeds: existingFeeds });
+                        return send(200, { success: true });
+                    }
+
+                    return send(400, { error: 'Unknown action' });
+                } catch (e) {
+                    return send(500, { error: e.message });
+                }
+            }
+
             try {
                 // Get existing feeds
                 let existingFeeds = [];

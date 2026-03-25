@@ -588,22 +588,9 @@ itemsContainer.addEventListener('click', (e) => {
             return;
         }
         const feeds = getFeeds(blobStore);
-        let found = false;
-        for (const feed of feeds) {
-            const matchKey = feed.title || feed.url;
-            if (matchKey === clickedFeedTitle) {
-                if (feed.items) {
-                    for (const item of feed.items) {
-                        item.unread = false;
-                    }
-                }
-                found = true;
-                break;
-            }
-        }
-        if (found) {
-            blobStore.set('feeds', feeds);
-            blobStore.syncNow();
+        const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
+        if (feed) {
+            blobStore.markFeedAsRead(feed.url);
             renderItems();
         }
     }
