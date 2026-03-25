@@ -115,16 +115,16 @@ function renderFeeds() {
     feedsContainer.innerHTML = feeds.map(feed => {
         let displayHtml = '';
         if (feed.title && feed.link) {
-            displayHtml = `<a href="${feed.link}" target="_blank">${feed.title}</a> <span style="margin-left: 8px; opacity: 0.6;">(<a href="${feed.url}" target="_blank">RSS</a>)</span>`;
+            displayHtml = `<a href="${escapeHtml(feed.link)}" target="_blank">${escapeHtml(feed.title)}</a> <span style="margin-left: 8px; opacity: 0.6;">(<a href="${escapeHtml(feed.url)}" target="_blank">RSS</a>)</span>`;
         } else if (feed.title) {
-            displayHtml = `${feed.title} <span style="margin-left: 8px; opacity: 0.6;">(<a href="${feed.url}" target="_blank">RSS</a>)</span>`;
+            displayHtml = `${escapeHtml(feed.title)} <span style="margin-left: 8px; opacity: 0.6;">(<a href="${escapeHtml(feed.url)}" target="_blank">RSS</a>)</span>`;
         } else {
-            displayHtml = `<a href="${feed.url}" target="_blank">${feed.url}</a>`;
+            displayHtml = `<a href="${escapeHtml(feed.url)}" target="_blank">${escapeHtml(feed.url)}</a>`;
         }
         return `
         <div class="feed-item">
             <span>${displayHtml}</span>
-            <button class="pure-button pure-button-small" onclick="removeFeed('${feed.url}')">Remove</button>
+            <button class="pure-button pure-button-small" onclick="removeFeed('${escapeHtml(feed.url)}')">Remove</button>
         </div>
     `}).join('');
 }
@@ -160,11 +160,10 @@ function truncateWords(text, wordCount) {
     return words.slice(0, wordCount).join(' ') + '...';
 }
 
-function stripHtml(html) {
-    if (!html) return '';
-    
-    // Keep only b, i, u, a, em, strong tags and their content
-    let result = html;
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
     
     // Replace <br> and </p> with newlines
     result = result.replace(/<br\s*\/?>/gi, '\n');
@@ -286,10 +285,10 @@ function renderItems() {
             <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
-                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${feedTitle}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${feedTitle}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
+                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
                 </div>
                 <div class="item-title">
-                    <a href="${item.link}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${item.link}">${titleHtml}</a>
+                    <a href="${escapeHtml(item.link)}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${escapeHtml(item.link)}">${titleHtml}</a>
                 </div>
                 ${contentHtml ? `<div class="item-content">${contentHtml}</div>` : ''}
             </div>
