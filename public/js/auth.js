@@ -582,13 +582,17 @@ itemsContainer.addEventListener('click', (e) => {
 
     const markAllLink = e.target.closest('a.mark-all-read-link');
     if (markAllLink) {
+        console.log('[Auth] Mark all read clicked');
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
+        console.log('[Auth] clickedFeedTitle:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
+        console.log('[Auth] Available feeds:', feeds.map(f => ({ title: f.title, url: f.url })));
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
+        console.log('[Auth] Found feed:', feed);
         if (feed) {
             blobStore.markFeedAsRead(feed.url);
             renderItems();

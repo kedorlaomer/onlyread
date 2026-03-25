@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[BlobStore]', ...args);
 }
@@ -298,14 +298,26 @@ export function createBlobStore() {
         },
 
         async markFeedAsRead(feedUrl) {
-            if (!currentUserId) return;
+            console.log('[BlobStore] markFeedAsRead called with:', feedUrl);
+            if (!currentUserId) {
+                console.log('[BlobStore] No currentUserId, returning');
+                return;
+            }
             const prefix = `blob_${currentUserId}_`;
             const feedsKey = `${prefix}feeds`;
             const feeds = memoryCache[feedsKey];
-            if (!feeds || !Array.isArray(feeds)) return;
+            console.log('[BlobStore] feeds from cache:', feeds ? `${feeds.length} feeds` : 'null/undefined');
+            if (!feeds || !Array.isArray(feeds)) {
+                console.log('[BlobStore] No feeds array, returning');
+                return;
+            }
 
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
-            if (feedIndex === -1) return;
+            console.log('[BlobStore] feedIndex:', feedIndex);
+            if (feedIndex === -1) {
+                console.log('[BlobStore] Feed not found in cache, returning');
+                return;
+            }
 
             let hasChanges = false;
             if (feeds[feedIndex].items) {
@@ -316,10 +328,12 @@ export function createBlobStore() {
                     }
                 }
             }
+            console.log('[BlobStore] hasChanges:', hasChanges);
 
             if (hasChanges) {
                 memoryCache[feedsKey] = feeds;
                 await dbSet(feedsKey, feeds);
+                console.log('[BlobStore] Calling worker postMessage');
                 if (worker) {
                     worker.postMessage({
                         type: 'markAllRead',

@@ -1,4 +1,4 @@
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[BlobWorker]', ...args);
 }
@@ -192,13 +192,18 @@ self.onmessage = async function(e) {
             break;
 
         case 'markAllRead':
-            if (!userId || !blobAvailable) return;
+            log('[BlobWorker] markAllRead received, feedUrl:', payload.feedUrl);
+            if (!userId || !blobAvailable) {
+                log('[BlobWorker] No userId or blobAvailable, returning');
+                return;
+            }
             try {
                 const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'markAllRead' })
                 });
+                log('[BlobWorker] markAllRead response:', response.status);
                 if (!response.ok) {
                     const text = await response.text();
                     log('markAllRead error:', text);
