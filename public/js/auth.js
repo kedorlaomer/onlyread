@@ -227,6 +227,10 @@ function renderItems() {
         }
     }
     
+    console.log('[Auth] renderItems allItems count:', allItems.length);
+    const janLukasItems = allItems.filter(i => i.feedTitle === 'Jan-Lukas Else');
+    console.log('[Auth] Jan-Lukas Else items in allItems:', janLukasItems.map(i => i.unread));
+    
     // Sort by pubDate descending
     allItems.sort((a, b) => {
         const dateA = parseRfc822Date(a.pubDate);
@@ -589,22 +593,20 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
-        console.log('[Auth] Clicked feed title:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
-        console.log('[Auth] Looking for feed with title/url:', clickedFeedTitle);
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
-        console.log('[Auth] Found feed:', feed ? 'YES' : 'NO', feed?.url);
         if (feed) {
-            console.log('[Auth] Calling markFeedAsRead for:', feed.url);
             blobStore.markFeedAsRead(feed.url);
-            console.log('[Auth] After markFeedAsRead, checking feeds:');
-            const feedsAfter = getFeeds(blobStore);
-            const testFeedAfter = feedsAfter.find(f => f.url === feed.url);
-            console.log('[Auth] Items after:', testFeedAfter?.items?.map(i => i.unread));
             renderItems();
+            console.log('[Auth] renderItems called, checking result:');
+            setTimeout(() => {
+                const feedsAfter = getFeeds(blobStore);
+                const testFeedAfter = feedsAfter.find(f => f.url === feed.url);
+                console.log('[Auth] Final items:', testFeedAfter?.items?.slice(0,2).map(i => ({ unread: i.unread })));
+            }, 500);
         }
     }
 
