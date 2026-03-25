@@ -287,8 +287,6 @@ function renderItems() {
         
         const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
         
-        console.log('[Auth] Rendering item, unread:', item.unread, 'unread===false:', item.unread === false, 'class will be:', item.unread === false ? ' read' : '');
-        
         return `
             <div class="item${item.unread === false ? ' read' : ''}">
                 <div class="item-meta">
