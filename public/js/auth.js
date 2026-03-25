@@ -192,7 +192,6 @@ function stripHtml(html) {
     
     return result;
 }
-}
 
 function getItemId(item) {
     return simpleHash(item.link);
