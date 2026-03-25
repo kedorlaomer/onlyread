@@ -1,6 +1,6 @@
 let userId = null;
 let syncInterval = null;
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 2000;
 
 const DEBUG = false;
