@@ -39,7 +39,10 @@ export async function subscribeToFeed(url, store) {
 
 async function validateFeed(url) {
     try {
-        const results = await fetchFeedBatch([url]);
+        const { results, errors } = await fetchFeedBatch([url]);
+        if (errors.length > 0) {
+            return { valid: false, error: errors[0].error };
+        }
         const data = results[0];
         
         if (!data || !data.text) {
@@ -129,10 +132,11 @@ export async function importFeeds(file, store, validate = true) {
             if (validate && newUrls.length > 0) {
                 // Batch fetch new URLs in chunks
                 const validUrls = new Set();
+                const invalidUrls = new Map();
                 
                 for (let i = 0; i < newUrls.length; i += BATCH_FETCH_SIZE) {
                     const chunk = newUrls.slice(i, i + BATCH_FETCH_SIZE);
-                    const results = await fetchFeedBatch(chunk);
+                    const { results, errors } = await fetchFeedBatch(chunk);
                     
                     for (const result of results) {
                         if (result && result.text) {
@@ -145,8 +149,13 @@ export async function importFeeds(file, store, validate = true) {
                                           result.text.trim().startsWith('<feed');
                             if (isRss) {
                                 validUrls.add(result.feedUrl);
+                            } else {
+                                invalidUrls.set(result.feedUrl, 'Not an RSS feed');
                             }
                         }
+                    }
+                    for (const error of errors) {
+                        invalidUrls.set(error.url, error.error);
                     }
                 }
 
@@ -222,7 +231,10 @@ export function exportFeedsAsText(store) {
 
 export async function fetchFeedItems(feedUrl) {
     try {
-        const results = await fetchFeedBatch([feedUrl]);
+        const { results, errors } = await fetchFeedBatch([feedUrl]);
+        if (errors.length > 0) {
+            return [];
+        }
         const data = results[0];
         if (!data || !data.text) {
             return [];

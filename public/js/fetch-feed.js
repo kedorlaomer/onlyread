@@ -5,7 +5,7 @@ function log(...args) {
 
 export async function fetchFeedBatch(urls) {
     if (!Array.isArray(urls)) urls = [urls];
-    if (urls.length === 0) return [];
+    if (urls.length === 0) return { results: [], errors: [] };
 
     try {
         const proxyUrl = `/.netlify/functions/fetch-feed?urls=${encodeURIComponent(JSON.stringify(urls))}`;
@@ -17,29 +17,40 @@ export async function fetchFeedBatch(urls) {
         // Check for size error first
         if (responseText.includes('ResponseSizeTooLarge') && urls.length > 1) {
             log('Response too large, retrying one by one');
-            const results = [];
+            let results = [];
+            let errors = [];
             for (const url of urls) {
                 const singleResult = await fetchFeedBatch([url]);
-                results.push(...singleResult);
+                results.push(...singleResult.results);
+                errors.push(...singleResult.errors);
             }
-            return results;
+            return { results, errors };
         }
 
         if (!response.ok) {
-            return [];
+            return { results: [], errors: urls.map(url => ({ url, error: `HTTP ${response.status}` })) };
         }
 
         const data = JSON.parse(responseText);
 
         if (data.results) {
-            return data.results.filter(r => r.text).map(r => ({ feedUrl: r.url, text: r.text }));
+            let results = [];
+            let errors = [];
+            for (const r of data.results) {
+                if (r.text) {
+                    results.push({ feedUrl: r.url, text: r.text });
+                } else if (r.error) {
+                    errors.push({ url: r.url, error: r.error });
+                }
+            }
+            return { results, errors };
         }
         if (data.url && data.text) {
-            return [{ feedUrl: data.url, text: data.text }];
+            return { results: [{ feedUrl: data.url, text: data.text }], errors: [] };
         }
-        return [];
+        return { results: [], errors: [] };
     } catch (e) {
         log('Batch fetch error:', e);
-        return [];
+        return { results: [], errors: urls.map(url => ({ url, error: e.message })) };
     }
 }

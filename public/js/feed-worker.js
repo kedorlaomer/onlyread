@@ -49,14 +49,20 @@ self.onmessage = async function(e) {
             log('Processing feeds:', payload.feeds.length);
             const feedUrls = payload.feeds.map(f => f.url);
             const batches = chunkArray(feedUrls, BATCH_SIZE);
+            const allErrors = [];
             
             for (const batch of batches) {
-                const results = await fetchFeedBatch(batch);
+                const { results, errors } = await fetchFeedBatch(batch);
                 for (const result of results) {
                     self.postMessage({ type: 'parseFeed', payload: result });
                 }
+                allErrors.push(...errors);
                 // Small delay between batches to avoid rate limiting
                 await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+            }
+            
+            if (allErrors.length > 0) {
+                self.postMessage({ type: 'feedErrors', payload: { errors: allErrors } });
             }
             break;
 

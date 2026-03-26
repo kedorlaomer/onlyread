@@ -390,28 +390,33 @@ function initFeedWorker(userId) {
     console.log('[Auth] Initializing feed worker...');
     feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
     
-    feedWorker.onmessage = (e) => {
-        const { type, payload } = e.data;
-        
-        switch (type) {
-            case 'ready':
-                console.log('[Auth] Feed worker ready');
-                break;
-            case 'getFeeds':
-                const feeds = blobStore.getAll().feeds || [];
-                feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
-                break;
-                
-            case 'parseFeed':
-                const result = parseFeedItems(payload.text);
-                if (result.items.length > 0) {
-                    addItemsToFeed(payload.feedUrl, result.items, blobStore);
-                    if (result.title || result.link) {
-                        updateFeedMeta(payload.feedUrl, result.title, result.link, blobStore);
+        feedWorker.onmessage = (e) => {
+            const { type, payload } = e.data;
+            
+            switch (type) {
+                case 'ready':
+                    console.log('[Auth] Feed worker ready');
+                    break;
+                case 'getFeeds':
+                    const feeds = blobStore.getAll().feeds || [];
+                    feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
+                    break;
+                    
+                case 'parseFeed':
+                    const result = parseFeedItems(payload.text);
+                    if (result.items.length > 0) {
+                        addItemsToFeed(payload.feedUrl, result.items, blobStore);
+                        if (result.title || result.link) {
+                            updateFeedMeta(payload.feedUrl, result.title, result.link, blobStore);
+                        }
+                        renderFeeds();
+                        renderItems();
                     }
-                    renderFeeds();
-                    renderItems();
-                }
+                    break;
+                    
+                case 'feedErrors':
+                    displayFeedErrors(payload.errors);
+                    break;
                 break;
         }
     };
@@ -431,7 +436,34 @@ function stopFeedWorker() {
     }
 }
 
+function displayFeedErrors(errors) {
+    if (!errors || errors.length === 0) return;
+    
+    // Find the feeds container in the manage page
+    const feedsContainer = document.getElementById('feeds-container');
+    if (!feedsContainer) return;
+    
+    // Create or update error display
+    let errorContainer = document.getElementById('feed-errors');
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'feed-errors';
+        errorContainer.style.cssText = 'margin: 1rem 0; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left;';
+        feedsContainer.parentNode.insertBefore(errorContainer, feedsContainer);
+    }
+    
+    const errorList = errors.map(e => `<li><strong>${escapeHtml(e.url)}</strong>: ${escapeHtml(e.error)}</li>`).join('');
+    errorContainer.innerHTML = `
+        <strong style="color: #856404;">Invalid Feeds (${errors.length})</strong>
+        <ul style="margin: 0.5rem 0 0 1rem; padding-left: 1rem;">${errorList}</ul>
+    `;
+}
+
 function triggerFeedScan() {
+    // Clear old errors before new scan
+    const errorContainer = document.getElementById('feed-errors');
+    if (errorContainer) errorContainer.remove();
+    
     if (feedWorker) {
         feedWorker.postMessage({ type: 'scan' });
     }
