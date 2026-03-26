@@ -436,8 +436,17 @@ function stopFeedWorker() {
     }
 }
 
+let feedErrors = [];
+
 function displayFeedErrors(errors) {
     if (!errors || errors.length === 0) return;
+    
+    // Add new errors to the list
+    for (const error of errors) {
+        if (!feedErrors.some(e => e.url === error.url)) {
+            feedErrors.push(error);
+        }
+    }
     
     // Find the feeds container in the manage page
     const feedsContainer = document.getElementById('feeds-container');
@@ -452,15 +461,16 @@ function displayFeedErrors(errors) {
         feedsContainer.parentNode.insertBefore(errorContainer, feedsContainer);
     }
     
-    const errorList = errors.map(e => `<li><strong>${escapeHtml(e.url)}</strong>: ${escapeHtml(e.error)}</li>`).join('');
+    const errorList = feedErrors.map(e => `<li><strong>${escapeHtml(e.url)}</strong>: ${escapeHtml(e.error)}</li>`).join('');
     errorContainer.innerHTML = `
-        <strong style="color: #856404;">Invalid Feeds (${errors.length})</strong>
+        <strong style="color: #856404;">Invalid Feeds (${feedErrors.length})</strong>
         <ul style="margin: 0.5rem 0 0 1rem; padding-left: 1rem;">${errorList}</ul>
     `;
 }
 
 function triggerFeedScan() {
     // Clear old errors before new scan
+    feedErrors = [];
     const errorContainer = document.getElementById('feed-errors');
     if (errorContainer) errorContainer.remove();
     
