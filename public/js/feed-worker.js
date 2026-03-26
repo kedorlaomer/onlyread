@@ -50,7 +50,8 @@ self.onmessage = async function(e) {
             const feedUrls = payload.feeds.map(f => f.url);
             const batches = chunkArray(feedUrls, BATCH_SIZE);
             
-            for (const batch of batches) {
+            for (let i = 0; i < batches.length; i++) {
+                const batch = batches[i];
                 const { results, errors } = await fetchFeedBatch(batch);
                 for (const result of results) {
                     self.postMessage({ type: 'parseFeed', payload: result });

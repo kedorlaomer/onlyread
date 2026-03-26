@@ -74,6 +74,10 @@ exports.handler = async (event, context) => {
                 }
             });
 
+            if (!response.ok) {
+                return { url, error: `HTTP ${response.status}` };
+            }
+
             const text = await response.text();
             const contentType = response.headers.get('content-type') || '';
 

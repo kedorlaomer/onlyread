@@ -398,7 +398,7 @@ function initFeedWorker(userId) {
                     console.log('[Auth] Feed worker ready');
                     break;
                 case 'getFeeds':
-                    const feeds = blobStore.getAll().feeds || [];
+                    const feeds = blobStore.get('feeds') || [];
                     feedWorker.postMessage({ type: 'feeds', payload: { feeds } });
                     break;
                     
@@ -417,7 +417,6 @@ function initFeedWorker(userId) {
                 case 'feedErrors':
                     displayFeedErrors(payload.errors);
                     break;
-                break;
         }
     };
     
@@ -458,7 +457,7 @@ function displayFeedErrors(errors) {
         errorContainer = document.createElement('div');
         errorContainer.id = 'feed-errors';
         errorContainer.style.cssText = 'margin: 1rem 0; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; text-align: left;';
-        feedsContainer.parentNode.insertBefore(errorContainer, feedsContainer);
+        feedsContainer.parentNode.prepend(errorContainer);
     }
     
     const errorList = feedErrors.map(e => `<li><strong>${escapeHtml(e.url)}</strong>: ${escapeHtml(e.error)}</li>`).join('');

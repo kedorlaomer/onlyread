@@ -43,11 +43,17 @@ export async function fetchFeedBatch(urls) {
                     errors.push({ url: r.url, error: r.error });
                 }
             }
+            log('Batch results:', results.length, 'errors:', errors.length);
             return { results, errors };
         }
         if (data.url && data.text) {
             return { results: [{ feedUrl: data.url, text: data.text }], errors: [] };
         }
+        if (data.url && data.error) {
+            log('Single URL error:', data.url, data.error);
+            return { results: [], errors: [{ url: data.url, error: data.error }] };
+        }
+        log('Unexpected response format:', JSON.stringify(data).substring(0, 200));
         return { results: [], errors: [] };
     } catch (e) {
         log('Batch fetch error:', e);
