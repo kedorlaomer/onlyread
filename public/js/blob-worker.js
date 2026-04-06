@@ -198,11 +198,13 @@ self.onmessage = async function(e) {
                 return;
             }
             try {
+                log('markAllRead: Making request to backend, userId:', userId);
                 const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'markAllRead' })
                 });
+                log('markAllRead: Response status:', response.status);
                 if (!response.ok) {
                     const text = await response.text();
                     log('markAllRead error:', text);
