@@ -629,14 +629,20 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
+        console.log('[Auth] Mark all as read clicked for:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
+        console.log('[Auth] All feeds:', feeds.map(f => ({ title: f.title, url: f.url })));
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
+        console.log('[Auth] Found feed:', feed);
         if (feed) {
+            console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
             blobStore.markFeedAsRead(feed.url);
             renderItems();
+        } else {
+            console.log('[Auth] ERROR: Feed not found!');
         }
     }
 
