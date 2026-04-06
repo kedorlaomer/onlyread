@@ -204,11 +204,11 @@ function markItemAsRead(item, blobStore) {
         for (const fItem of feed.items) {
             if (fItem.link === item.link) {
                 fItem.unread = false;
+                blobStore.markItemReadState(feed.url, item.link, true);
                 break;
             }
         }
     }
-    blobStore.set('feeds', feeds);
 }
 
 function renderItems() {
