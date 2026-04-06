@@ -638,8 +638,12 @@ itemsContainer.addEventListener('click', (e) => {
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
         console.log('[Auth] Found feed:', feed);
         if (feed) {
+            console.log('[Auth] Before markFeedAsRead, items:', feed.items?.map(i => ({ link: i.link, unread: i.unread })));
             console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
             blobStore.markFeedAsRead(feed.url);
+            const feedsAfter = getFeeds(blobStore);
+            const feedAfter = feedsAfter.find(f => f.url === feed.url);
+            console.log('[Auth] After markFeedAsRead, items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread })));
             renderItems();
         } else {
             console.log('[Auth] ERROR: Feed not found!');
