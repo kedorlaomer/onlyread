@@ -637,6 +637,10 @@ itemsContainer.addEventListener('click', (e) => {
         console.log('[Auth] All feeds:', feeds.map(f => ({ title: f.title, url: f.url })));
         const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
         console.log('[Auth] Found feed:', feed);
+        console.log('[Auth] Feed items count:', feed.items?.length);
+        if (feed.items?.length > 0) {
+            console.log('[Auth] Feed items:', feed.items.map(i => ({ link: i.link.substring(0, 50), unread: i.unread === undefined ? 'undefined' : i.unread })));
+        }
         if (feed) {
             console.log('[Auth] Before markFeedAsRead, items:', feed.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
             console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
