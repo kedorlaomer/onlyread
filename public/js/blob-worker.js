@@ -192,7 +192,11 @@ self.onmessage = async function(e) {
             break;
 
         case 'markAllRead':
-            if (!userId || !blobAvailable) return;
+            log('markAllRead received, payload:', payload);
+            if (!userId || !blobAvailable) {
+                log('markAllRead skipped: userId or blobAvailable not ready');
+                return;
+            }
             try {
                 const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',

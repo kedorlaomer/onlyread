@@ -315,11 +315,15 @@ export function createBlobStore() {
             
             memoryCache[feedsKey] = feeds;
             await dbSet(feedsKey, feeds);
+            console.log('[BlobStore] markFeedAsRead: Updated local feeds, items:', feeds[feedIndex].items?.length);
             if (worker) {
+                console.log('[BlobStore] markFeedAsRead: Posting worker message, feedUrl:', feedUrl);
                 worker.postMessage({
                     type: 'markAllRead',
                     payload: { feedUrl }
                 });
+            } else {
+                console.log('[BlobStore] markFeedAsRead: ERROR - worker is null!');
             }
         },
 
