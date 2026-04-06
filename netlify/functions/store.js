@@ -110,6 +110,20 @@ exports.handler = async (event, context) => {
                         return send(200, { success: true });
                     }
 
+                    if (data.action === 'markItemRead' || data.action === 'markItemUnread') {
+                        const isRead = data.action === 'markItemRead';
+                        if (existingFeeds[feedIndex].items && data.itemLink) {
+                            for (const item of existingFeeds[feedIndex].items) {
+                                if (item.link === data.itemLink) {
+                                    item.unread = !isRead;
+                                    break;
+                                }
+                            }
+                        }
+                        await store.setJSON(userId, { feeds: existingFeeds });
+                        return send(200, { success: true });
+                    }
+
                     return send(400, { error: 'Unknown action' });
                 } catch (e) {
                     return send(500, { error: e.message });

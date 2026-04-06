@@ -599,14 +599,13 @@ itemsContainer.addEventListener('click', (e) => {
         for (const feed of feeds) {
             if (!feed.items) continue;
             for (const item of feed.items) {
-                    if (item.link === itemLink && item.unread) {
+                if (item.link === itemLink && item.unread) {
                     item.unread = false;
+                    blobStore.markItemReadState(feed.url, itemLink, true);
                     break;
                 }
             }
         }
-        blobStore.set('feeds', feeds);
-        blobStore.syncNow();
         renderItems();
     }
 });
@@ -651,12 +650,11 @@ itemsContainer.addEventListener('click', (e) => {
             for (const item of feed.items) {
                 if (item.link === clickedItemLink) {
                     item.unread = true;
+                    blobStore.markItemReadState(feed.url, clickedItemLink, false);
                     break;
                 }
             }
         }
-        blobStore.set('feeds', feeds);
-        blobStore.syncNow();
         renderItems();
     }
 });

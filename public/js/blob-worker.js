@@ -208,6 +208,25 @@ self.onmessage = async function(e) {
             }
             break;
 
+        case 'markItemRead':
+        case 'markItemUnread':
+            if (!userId || !blobAvailable) return;
+            try {
+                const isRead = type === 'markItemRead';
+                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: isRead ? 'markItemRead' : 'markItemUnread', itemLink: payload.itemLink })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    log('markItem error:', text);
+                }
+            } catch (e) {
+                log('markItem failed:', e.message);
+            }
+            break;
+
         case 'stop':
             stopSync();
             self.postMessage({ type: 'stopped' });

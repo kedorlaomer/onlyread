@@ -307,7 +307,6 @@ export function createBlobStore() {
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
             if (feedIndex === -1) return;
 
-            // Always mark all items as read in local cache
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
                     item.unread = false;
@@ -320,6 +319,35 @@ export function createBlobStore() {
                 worker.postMessage({
                     type: 'markAllRead',
                     payload: { feedUrl }
+                });
+            }
+        },
+
+        async markItemReadState(feedUrl, itemLink, isRead) {
+            if (!currentUserId) return;
+            const prefix = `blob_${currentUserId}_`;
+            const feedsKey = `${prefix}feeds`;
+            const feeds = memoryCache[feedsKey];
+            if (!feeds || !Array.isArray(feeds)) return;
+
+            const feedIndex = feeds.findIndex(f => f.url === feedUrl);
+            if (feedIndex === -1) return;
+
+            if (feeds[feedIndex].items) {
+                for (const item of feeds[feedIndex].items) {
+                    if (item.link === itemLink) {
+                        item.unread = !isRead;
+                        break;
+                    }
+                }
+            }
+            
+            memoryCache[feedsKey] = feeds;
+            await dbSet(feedsKey, feeds);
+            if (worker) {
+                worker.postMessage({
+                    type: isRead ? 'markItemRead' : 'markItemUnread',
+                    payload: { feedUrl, itemLink }
                 });
             }
         }
