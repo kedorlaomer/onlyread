@@ -214,6 +214,7 @@ function markItemAsRead(item, blobStore) {
 function renderItems() {
     if (!blobStore) return;
     const feeds = getFeeds(blobStore);
+    log('renderItems: feeds count:', feeds.length);
     
     let allItems = [];
     for (const feed of feeds) {
@@ -226,6 +227,8 @@ function renderItems() {
             });
         }
     }
+    log('renderItems: total items before filter:', allItems.length);
+    log('renderItems: sample items:', allItems.slice(0, 3).map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, unreadType: typeof i.unread })));
     
     // Sort by pubDate descending
     allItems.sort((a, b) => {
@@ -238,12 +241,15 @@ function renderItems() {
     });
     
     if (hideRead) {
+        log('renderItems: hideRead is true, filtering');
         allItems = allItems.filter(item => item.unread !== false);
     }
     
     if (filteredFeedTitle) {
         allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
     }
+    
+    log('renderItems: total items after filter:', allItems.length);
     
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
@@ -287,8 +293,11 @@ function renderItems() {
         
         const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
         
+        const itemClass = item.unread === false ? 'item read' : 'item';
+        log('renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30));
+        
         return `
-            <div class="item${item.unread === false ? ' read' : ''}">
+            <div class="${itemClass}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
                     <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>

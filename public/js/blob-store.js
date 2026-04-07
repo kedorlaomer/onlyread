@@ -201,9 +201,11 @@ export function createBlobStore() {
                             // Log the feeds to see their state
                             const feeds = memoryCache[getStorageKey(userId, 'feeds')];
                             if (feeds && Array.isArray(feeds)) {
-                                const targetFeed = feeds.find(f => f.url === 'https://solar.lowtechmagazine.com/index.xml');
-                                if (targetFeed) {
-                                    log('syncFromBlob: LOWTECH feed items after sync:', targetFeed.items?.map(i => ({ link: i.link, unread: i.unread })));
+                                for (const feed of feeds.slice(0, 5)) {
+                                    log('syncFromBlob: feed:', feed.title || feed.url, 'items count:', feed.items?.length);
+                                    if (feed.items && feed.items.length > 0) {
+                                        log('syncFromBlob: sample item unread states:', feed.items.slice(0, 3).map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, type: typeof i.unread })));
+                                    }
                                 }
                             }
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
