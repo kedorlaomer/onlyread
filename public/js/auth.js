@@ -27,7 +27,7 @@ let feedWorker = null;
 let hideRead = false;
 let filteredFeedTitle = null;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
@@ -213,6 +213,7 @@ function markItemAsRead(item, blobStore) {
 
 function renderItems() {
     if (!blobStore) return;
+    try {
     const feeds = getFeeds(blobStore);
     log('renderItems: feeds count:', feeds.length);
     
@@ -294,7 +295,7 @@ function renderItems() {
         const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
         
         const itemClass = item.unread === false ? 'item read' : 'item';
-        log('renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30));
+        console.log('[Auth] renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30), 'unread:', item.unread, 'type:', typeof item.unread);
         
         return `
             <div class="${itemClass}">
@@ -309,6 +310,10 @@ function renderItems() {
             </div>
         `;
     }).join('') + '</div>';
+    log('renderItems: finished successfully');
+    } catch (e) {
+        console.error('[Auth] renderItems: ERROR:', e);
+    }
 }
 
 function unescapeXml(text) {
@@ -660,7 +665,9 @@ itemsContainer.addEventListener('click', (e) => {
             const feedsAfter = getFeeds(blobStore);
             const feedAfter = feedsAfter.find(f => f.url === feed.url);
             console.log('[Auth] After markFeedAsRead, items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
+            log('renderItems: about to render');
             renderItems();
+            log('renderItems: finished');
         } else {
             console.log('[Auth] ERROR: Feed not found!');
         }
