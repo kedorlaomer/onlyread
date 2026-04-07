@@ -269,6 +269,11 @@ function renderItems() {
         let titleHtml = '';
         let contentHtml = '';
         
+        // Special logging for Jan-Lukas feed
+        if (feedTitle && feedTitle.includes('Jan-Lukas')) {
+            console.log('[Auth] renderItems: Jan-Lukas item:', { link: item.link, unread: item.unread, type: typeof item.unread });
+        }
+        
         if (item.description) {
             const cleanText = stripHtml(item.description);
             const words = cleanText.split(/\s+/);
