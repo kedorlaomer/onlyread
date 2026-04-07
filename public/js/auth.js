@@ -631,14 +631,15 @@ itemsContainer.addEventListener('click', (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
-        console.log('[Auth] Mark all as read clicked for:', clickedFeedTitle);
+        log('Mark all as read clicked for:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
-        console.log('[Auth] All feeds:', feeds.map(f => ({ title: f.title, url: f.url })));
-        const feed = feeds.find(f => (f.title || f.url) === clickedFeedTitle);
-        console.log('[Auth] Found feed:', feed);
+        log('All feeds titles:', feeds.map(f => ({ title: f.title, url: f.url })));
+        // Try matching by title OR by URL
+        const feed = feeds.find(f => f.title === clickedFeedTitle || f.url === clickedFeedTitle);
+        log('Found feed:', feed);
         console.log('[Auth] Feed items count:', feed.items?.length);
         if (feed.items?.length > 0) {
             console.log('[Auth] Feed items:', feed.items.map(i => ({ link: i.link.substring(0, 50), unread: i.unread === undefined ? 'undefined' : i.unread })));

@@ -54,7 +54,8 @@ self.onmessage = async function(e) {
                 const batch = batches[i];
                 const { results, errors } = await fetchFeedBatch(batch);
                 for (const result of results) {
-                    self.postMessage({ type: 'parseFeed', payload: result });
+                    log('Sending parseFeed for:', result.feedUrl);
+                    self.postMessage({ type: 'parseFeed', payload: { feedUrl: result.feedUrl, text: result.text } });
                 }
                 if (errors.length > 0) {
                     self.postMessage({ type: 'feedErrors', payload: { errors } });

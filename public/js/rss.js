@@ -304,10 +304,18 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     }
     
     const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
+    console.log('[RSS] addItemsToFeed: existing items count:', feeds[feedIndex].items.length, 'new items:', newItems.length);
     
     for (const item of newItems) {
         if (!existingLinks.has(item.link)) {
             feeds[feedIndex].items.push(item);
+            console.log('[RSS] addItemsToFeed: added new item:', item.link.substring(0, 50), 'unread:', item.unread);
+        } else {
+            // Item exists - check if we need to preserve read state
+            const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
+            if (existingItem && existingItem.unread === false) {
+                console.log('[RSS] addItemsToFeed: preserving read state for:', item.link.substring(0, 50));
+            }
         }
     }
     

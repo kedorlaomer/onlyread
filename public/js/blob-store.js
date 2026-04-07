@@ -190,12 +190,22 @@ export function createBlobStore() {
 
                     case 'syncFromBlob':
                         (async () => {
+                            log('syncFromBlob received, data keys:', Object.keys(data));
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
+                                const oldValue = memoryCache[storageKey];
                                 memoryCache[storageKey] = value;
                                 await dbSet(storageKey, value);
                             }
                             log('Initialized from blob:', Object.keys(data));
+                            // Log the feeds to see their state
+                            const feeds = memoryCache[getStorageKey(userId, 'feeds')];
+                            if (feeds && Array.isArray(feeds)) {
+                                const targetFeed = feeds.find(f => f.url === 'https://solar.lowtechmagazine.com/index.xml');
+                                if (targetFeed) {
+                                    log('syncFromBlob: LOWTECH feed items after sync:', targetFeed.items?.map(i => ({ link: i.link, unread: i.unread })));
+                                }
+                            }
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                         })();
                         break;
@@ -308,6 +318,8 @@ export function createBlobStore() {
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
             if (feedIndex === -1) return;
 
+            log('markFeedAsRead: Before update, items:', feeds[feedIndex]?.items?.map(i => ({ link: i.link, unread: i.unread })));
+            
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
                     item.unread = false;
@@ -316,15 +328,15 @@ export function createBlobStore() {
             
             memoryCache[feedsKey] = feeds;
             await dbSet(feedsKey, feeds);
-            console.log('[BlobStore] markFeedAsRead: Updated local feeds, items:', feeds[feedIndex].items?.length);
+            log('markFeedAsRead: After update, items:', feeds[feedIndex]?.items?.map(i => ({ link: i.link, unread: i.unread })));
             if (worker) {
-                console.log('[BlobStore] markFeedAsRead: Posting worker message, feedUrl:', feedUrl);
+                log('markFeedAsRead: Posting worker message, feedUrl:', feedUrl);
                 worker.postMessage({
                     type: 'markAllRead',
                     payload: { feedUrl }
                 });
             } else {
-                console.log('[BlobStore] markFeedAsRead: ERROR - worker is null!');
+                log('markFeedAsRead: ERROR - worker is null!');
             }
         },
 
