@@ -571,7 +571,10 @@ netlifyIdentity.on('login', async (user) => {
         console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
-        console.log('[Auth] Blob store initialized, initializing feed worker');
+        console.log('[Auth] Blob store initialized, displaying cached data');
+        renderItems();
+        renderFeeds();
+        console.log('[Auth] Initializing feed worker for background sync');
         initFeedWorker(jwtPayload.sub);
     }
     console.log('[Auth] Calling updateUI');
