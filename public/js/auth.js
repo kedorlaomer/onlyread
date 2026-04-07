@@ -571,10 +571,9 @@ netlifyIdentity.on('login', async (user) => {
         console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
-        console.log('[Auth] Blob store initialized, displaying cached data');
+        console.log('[Auth] Blob store initialized, displaying cached data immediately');
         renderItems();
         renderFeeds();
-        console.log('[Auth] Initializing feed worker for background sync');
         initFeedWorker(jwtPayload.sub);
     }
     console.log('[Auth] Calling updateUI');
@@ -677,3 +676,9 @@ itemsContainer.addEventListener('click', (e) => {
 });
 
 updateUI();
+
+window.addEventListener('onlyread:dataUpdated', () => {
+    console.log('[Auth] Data updated from blob, re-rendering UI');
+    renderItems();
+    renderFeeds();
+});

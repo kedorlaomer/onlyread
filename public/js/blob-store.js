@@ -196,6 +196,7 @@ export function createBlobStore() {
                                 await dbSet(storageKey, value);
                             }
                             log('Initialized from blob:', Object.keys(data));
+                            window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                         })();
                         break;
 

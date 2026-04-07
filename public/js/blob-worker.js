@@ -173,9 +173,9 @@ self.onmessage = async function(e) {
             userId = payload.userId;
             siteId = payload.siteId;
             await checkBlobAvailability();
+            self.postMessage({ type: 'ready', blobAvailable });
             await syncFromBlob();
             startSync();
-            self.postMessage({ type: 'ready', blobAvailable });
             break;
 
         case 'sync':
