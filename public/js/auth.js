@@ -724,7 +724,14 @@ itemsContainer.addEventListener('click', async (e) => {
 updateUI();
 
 window.addEventListener('onlyread:dataUpdated', () => {
-    if (DEBUG) console.log('[Auth] Data updated from blob, re-rendering UI');
     debouncedRenderItems();
     renderFeeds();
 });
+
+window.onlyreadDebug = function() {
+    const feedsInUI = document.querySelectorAll('.filter-feed-link');
+    console.log('=== Feeds displayed in UI ===');
+    feedsInUI.forEach(link => {
+        console.log(link.getAttribute('data-feed-title'));
+    });
+};
