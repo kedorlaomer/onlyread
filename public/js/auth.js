@@ -676,7 +676,7 @@ itemsContainer.addEventListener('click', async (e) => {
         if (feed) {
             console.log('[Auth] Before markFeedAsRead, items:', feed.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
             console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
-            blobStore.markFeedAsRead(feed.url);
+            await blobStore.markFeedAsRead(feed.url);
             // Check data immediately after
             const feedsCheck1 = getFeeds(blobStore);
             const feedCheck1 = feedsCheck1.find(f => f.url === feed.url);
