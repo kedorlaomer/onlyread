@@ -770,55 +770,27 @@ window.addEventListener('onlyread:dataUpdated', () => {
 });
 
 window.onlyreadDebug = function() {
-    // Get feeds displayed in the UI
-    const filterLinks = document.querySelectorAll('.filter-feed-link');
-    const uiFeedTitles = new Set();
-    filterLinks.forEach(link => {
-        uiFeedTitles.add(link.getAttribute('data-feed-title'));
-    });
-    
-    console.log('=== FEEDS IN UI (' + uiFeedTitles.size + ') ===');
-    uiFeedTitles.forEach(title => console.log(title));
-    
     if (!blobStore) {
         console.log('blobStore not initialized');
         return;
     }
     
-    console.log('=== getFeeds(blobStore) ===');
+    console.log('=== SIMPLE CHECK ===');
     const feeds = getFeeds(blobStore);
-    const uiFeedsInDb = [];
+    const targetFeeds = ['Jan-Lukas Else', 'Astrodicticum Simplex', 'LOW←TECH MAGAZINE English'];
     
-    uiFeedTitles.forEach(title => {
-        // Try different matching strategies
-        let feed = feeds.find(f => f.title === title);
-        if (!feed) feed = feeds.find(f => f.url === title);
-        if (!feed) feed = feeds.find(f => (f.title || f.url).includes(title));
-        
+    targetFeeds.forEach(title => {
+        const feed = feeds.find(f => f.title === title);
         if (feed) {
-            let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
-            let readCount = (feed.items || []).filter(i => i.unread === false).length;
-            console.log((feed.title || feed.url) + ' -> read:' + readCount + ' unread:' + unreadCount);
-            console.log('  url:', feed.url);
-            uiFeedsInDb.push(feed);
+            console.log('--- ' + feed.title + ' ---');
+            console.log('URL:', feed.url);
+            console.log('items count:', feed.items?.length);
+            if (feed.items?.length > 0) {
+                console.log('item[0].unread:', feed.items[0].unread, 'type:', typeof feed.items[0].unread);
+                console.log('item[0]:', JSON.stringify(feed.items[0]).substring(0, 200));
+            }
         } else {
             console.log('NOT FOUND:', title);
         }
     });
-    
-    // Check if getFeeds returns different data than blobStore.get('feeds')
-    console.log('=== direct blobStore.get(feeds) ===');
-    const directFeeds = blobStore.get('feeds');
-    if (directFeeds && directFeeds.length > 0) {
-        uiFeedTitles.forEach(title => {
-            let feed = directFeeds.find(f => f.title === title);
-            if (!feed) feed = directFeeds.find(f => f.url === title);
-            if (!feed) feed = directFeeds.find(f => (f.title || f.url).includes(title));
-            if (feed) {
-                let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
-                let readCount = (feed.items || []).filter(i => i.unread === false).length;
-                console.log((feed.title || feed.url) + ' -> read:' + readCount + ' unread:' + unreadCount);
-            }
-        });
-    }
 };
