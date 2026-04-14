@@ -324,16 +324,13 @@ const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a 
 
         const itemClass = item.unread === false ? 'item read' : 'item';
         
-        // Debug: log for first 3 items rendered
-        if (!window._renderDebugFlag) {
-            console.log('DEBUG render sample:');
-            window._renderDebugFlag = true;
+        // Debug: check for specific feeds
+        if (!window._debugRender && ['Astrodicticum Simplex', 'Jan-Lukas Else', 'LOW←TECH MAGAZINE English'].includes(feedTitle)) {
+            console.log('RENDER:', feedTitle, '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
+            window._debugRender = window._debugRender || 0;
+            window._debugRender++;
+            if (window._debugRender >= 3) window._debugRender = null;
         }
-        if (window._renderCount < 3) {
-            console.log('  feed:', feedTitle, '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
-            window._renderCount++;
-        }
-        console.log('[Auth] renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30), 'unread:', item.unread, 'type:', typeof item.unread);
         
         return `
             <div class="${itemClass}">
