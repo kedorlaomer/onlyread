@@ -324,9 +324,14 @@ const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a 
 
         const itemClass = item.unread === false ? 'item read' : 'item';
         
-        // Debug: log what's happening for problematic feeds
-        if (['Astrocicticum Simplex', 'Jan-Lukas Else', 'LOW←TECH MAGAZINE English', 'J. B. Crawford', 'blog :: Brent -> [String]'].includes(feedTitle)) {
-            console.log('DEBUG render:', feedTitle, '| link:', item.link?.substring(0,20), '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
+        // Debug: log for first 3 items rendered
+        if (!window._renderDebugFlag) {
+            console.log('DEBUG render sample:');
+            window._renderDebugFlag = true;
+        }
+        if (window._renderCount < 3) {
+            console.log('  feed:', feedTitle, '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
+            window._renderCount++;
         }
         console.log('[Auth] renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30), 'unread:', item.unread, 'type:', typeof item.unread);
         
@@ -780,21 +785,40 @@ window.onlyreadDebug = function() {
         return;
     }
     
-    // Check corresponding URLs in database
+    console.log('=== getFeeds(blobStore) ===');
     const feeds = getFeeds(blobStore);
-    const mismatched = [];
+    const uiFeedsInDb = [];
     
     uiFeedTitles.forEach(title => {
-        const feed = feeds.find(f => f.title === title || f.url === title);
+        // Try different matching strategies
+        let feed = feeds.find(f => f.title === title);
+        if (!feed) feed = feeds.find(f => f.url === title);
+        if (!feed) feed = feeds.find(f => (f.title || f.url).includes(title));
+        
         if (feed) {
             let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
             let readCount = (feed.items || []).filter(i => i.unread === false).length;
             console.log((feed.title || feed.url) + ' -> read:' + readCount + ' unread:' + unreadCount);
-            if (unreadCount > 0) {
-                mismatched.push(feed.url);
-            }
+            console.log('  url:', feed.url);
+            uiFeedsInDb.push(feed);
+        } else {
+            console.log('NOT FOUND:', title);
         }
     });
     
-    console.log('=== ' + mismatched.length + ' feeds with unread items ===');
+    // Check if getFeeds returns different data than blobStore.get('feeds')
+    console.log('=== direct blobStore.get(feeds) ===');
+    const directFeeds = blobStore.get('feeds');
+    if (directFeeds && directFeeds.length > 0) {
+        uiFeedTitles.forEach(title => {
+            let feed = directFeeds.find(f => f.title === title);
+            if (!feed) feed = directFeeds.find(f => f.url === title);
+            if (!feed) feed = directFeeds.find(f => (f.title || f.url).includes(title));
+            if (feed) {
+                let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
+                let readCount = (feed.items || []).filter(i => i.unread === false).length;
+                console.log((feed.title || feed.url) + ' -> read:' + readCount + ' unread:' + unreadCount);
+            }
+        });
+    }
 };
