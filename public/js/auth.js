@@ -320,9 +320,14 @@ function renderItems() {
             titleHtml = feedTitle;
         }
         
-        const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
-        
+const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
+
         const itemClass = item.unread === false ? 'item read' : 'item';
+        
+        // Debug: log what's happening for problematic feeds
+        if (['Astrocicticum Simplex', 'Jan-Lukas Else', 'LOW←TECH MAGAZINE English', 'J. B. Crawford', 'blog :: Brent -> [String]'].includes(feedTitle)) {
+            console.log('DEBUG render:', feedTitle, '| link:', item.link?.substring(0,20), '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
+        }
         console.log('[Auth] renderItems: item class:', itemClass, 'for link:', item.link?.substring(0, 30), 'unread:', item.unread, 'type:', typeof item.unread);
         
         return `
