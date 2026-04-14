@@ -634,7 +634,7 @@ itemsContainer.addEventListener('click', (e) => {
     }
 });
 
-itemsContainer.addEventListener('click', (e) => {
+itemsContainer.addEventListener('click', async (e) => {
     const filterLink = e.target.closest('a.filter-feed-link');
     if (filterLink) {
         e.preventDefault();
