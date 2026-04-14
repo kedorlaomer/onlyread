@@ -1,6 +1,6 @@
 import { fetchFeedBatch } from './fetch-feed.js';
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[RSS]', ...args);
 }
