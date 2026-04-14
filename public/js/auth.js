@@ -772,21 +772,22 @@ window.onlyreadDebug = function() {
         return;
     }
     
-    console.log('=== Check data sources for Jan-Lukas ===');
+    console.log('=== FEEDS DISPLAYED IN UI ===');
+    const itemsInUI = document.querySelectorAll('.item');
+    const itemFeeds = document.querySelectorAll('.filter-feed-link');
+    itemFeeds.forEach(link => {
+        console.log(link.getAttribute('data-feed-title'));
+    });
+    
+    console.log('=== Check data sources ===');
     
     // From getFeeds() function
     const viaGetFeeds = getFeeds(blobStore);
     const viaGet = viaGetFeeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('via getFeeds():', viaGet?.items?.length, 'items, first unread:', viaGet?.items?.[0]?.unread);
+    console.log('Jan-Lukas via getFeeds():', viaGet?.items?.length, 'items, first unread:', viaGet?.items?.[0]?.unread);
     
     // Direct from blobStore
     const direct = blobStore.get('feeds');
     const viaDirect = direct?.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('via blobStore.get():', viaDirect?.items?.length, 'items, first unread:', viaDirect?.items?.[0]?.unread);
-    
-    // Are they the same object?
-    console.log('Same object?', viaGet === viaDirect);
-    if (viaGet?.items && viaDirect?.items) {
-        console.log('via Get items === via Direct items:', viaGet.items === viaDirect.items);
-    }
+    console.log('Jan-Lukas via blobStore.get():', viaDirect?.items?.length, 'items, first unread:', viaDirect?.items?.[0]?.unread);
 };
