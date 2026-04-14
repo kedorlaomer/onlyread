@@ -255,6 +255,13 @@ function renderItems() {
     log('renderItems: hideRead:', hideRead);
     log('renderItems: All feed titles:', feeds.map(f => f.title || f.url));
     
+    // Special log for Jan-Lukas feed data
+    const jlFeed = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
+    log('renderItems: Jan-Lukas feed found:', !!jlFeed, 'items:', jlFeed?.items?.length);
+    if (jlFeed?.items) {
+        log('renderItems: Jan-Lukas items in feed:', jlFeed.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread })));
+    }
+    
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
         return;
