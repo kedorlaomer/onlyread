@@ -764,12 +764,9 @@ window.onlyreadDebug = function() {
         console.log('blobStore not initialized');
         return;
     }
-    console.log('Feeds with items:');
+    console.log('=== ALL FEEDS ===');
     getFeeds(blobStore).forEach(f => {
-        if (f.items && f.items.length > 0) {
-            console.log(f.url || f.title);
-            console.log('  items:', f.items.length);
-            console.log('  first item unread:', f.items[0].unread, 'type:', typeof f.items[0].unread);
-        }
+        console.log((f.title || f.url) + ' | ' + f.url);
+        console.log('  items:', f.items?.length || 0, '| first unread:', f.items?.[0]?.unread);
     });
 };
