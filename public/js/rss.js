@@ -304,7 +304,9 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     }
     
     const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
-    console.log('[RSS] addItemsToFeed: URL:', feedUrl, 'existing:', feeds[feedIndex].items.length, 'new from server:', newItems.length);
+    console.log('[RSS] addItemsToFeed:', feedUrl, 'existing:', feeds[feedIndex].items.length, 'new:', newItems.length);
+    
+    let changed = false;
     
     for (const item of newItems) {
         if (!existingLinks.has(item.link)) {
@@ -323,24 +325,28 @@ export function addItemsToFeed(feedUrl, newItems, store) {
                 }
             }
             
-            // Check if this is a REALLY new item or if we're getting all items from server each time
-            console.log('[RSS] NEW item:', item.link?.substring(0, 40), 'unread:', existingItemUnread);
-            
             feeds[feedIndex].items.push({
                 ...item,
                 unread: existingItemUnread
             });
+            changed = true;
+            console.log('[RSS] NEW:', item.link?.substring(0, 30), 'unread:', existingItemUnread);
         } else {
-            // Item already exists - preserve read state from local storage, don't overwrite with server's unread=true
+            // Item already exists - ALWAYS preserve LOCAL read state, never overwrite with server
             const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
-            if (existingItem) {
-                // Ensure read state is preserved
-                console.log('[RSS] EXISTING item, preserving:', existingItem.unread);
+            if (existingItem && item.unread !== existingItem.unread) {
+                // Server says different - keep local state
+                console.log('[RSS] PRESERVE local:', item.link?.substring(0, 30), 'local:', existingItem.unread, 'server:', item.unread);
             }
+            // DO NOTHING - the existing item keeps its local unread state
         }
     }
     
-    store.set('feeds', feeds);
+    // Force immediate save
+    if (changed) {
+        console.log('[RSS] Saving to store immediately');
+        store.set('feeds', feeds);
+    }
 }
 
 export function updateFeedMeta(feedUrl, title, link, store) {
