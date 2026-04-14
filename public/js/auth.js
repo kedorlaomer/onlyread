@@ -251,6 +251,9 @@ function renderItems() {
     }
     
     log('renderItems: total items after filter:', allItems.length);
+    log('renderItems: filteredFeedTitle:', filteredFeedTitle);
+    log('renderItems: hideRead:', hideRead);
+    log('renderItems: All feed titles:', feeds.map(f => f.title || f.url));
     
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
@@ -667,9 +670,17 @@ itemsContainer.addEventListener('click', (e) => {
             console.log('[Auth] Before markFeedAsRead, items:', feed.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
             console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
             blobStore.markFeedAsRead(feed.url);
+            // Check data immediately after
+            const feedsCheck1 = getFeeds(blobStore);
+            const feedCheck1 = feedsCheck1.find(f => f.url === feed.url);
+            console.log('[Auth] Immediate after markFeedAsRead:', feedCheck1?.items?.map(i => ({ link: i.link, unread: i.unread })));
+            
+            // Force sync to IndexedDB first
+            await new Promise(r => setTimeout(r, 100));
             const feedsAfter = getFeeds(blobStore);
             const feedAfter = feedsAfter.find(f => f.url === feed.url);
-            console.log('[Auth] After markFeedAsRead, items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
+            console.log('[Auth] After markFeedAsRead (100ms later), items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
+            
             log('renderItems: about to render');
             renderItems();
             log('renderItems: finished');
