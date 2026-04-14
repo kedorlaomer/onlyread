@@ -760,19 +760,37 @@ window.addEventListener('onlyread:dataUpdated', () => {
 });
 
 window.onlyreadDebug = function() {
+    // Get feeds displayed in the UI
+    const filterLinks = document.querySelectorAll('.filter-feed-link');
+    const uiFeedTitles = new Set();
+    filterLinks.forEach(link => {
+        uiFeedTitles.add(link.getAttribute('data-feed-title'));
+    });
+    
+    console.log('=== FEEDS IN UI (' + uiFeedTitles.size + ') ===');
+    
     if (!blobStore) {
         console.log('blobStore not initialized');
         return;
     }
-    console.log('=== ALL FEEDS ===');
-    getFeeds(blobStore).forEach(f => {
-        let unreadCount = 0;
-        let readCount = 0;
-        f.items?.forEach(i => {
-            if (i.unread === false) readCount++;
-            else unreadCount++;
-        });
-        console.log((f.title || f.url) + ' | ' + f.url);
-        console.log('  total:', f.items?.length || 0, '| read:', readCount, '| unread:', unreadCount);
+    
+    // Check corresponding URLs in database
+    const feeds = getFeeds(blobStore);
+    const mismatched = [];
+    
+    uiFeedTitles.forEach(title => {
+        const feed = feeds.find(f => f.title === title || f.url === title);
+        if (feed) {
+            let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
+            let readCount = (feed.items || []).filter(i => i.unread === false).length;
+            if (unreadCount > 0) {
+                console.log('UNREAD:', feed.title || feed.url);
+                console.log('  URL:', feed.url);
+                console.log('  items:', feed.items?.length || 0, '| read:', readCount, '| unread:', unreadCount);
+                mismatched.push(feed.url);
+            }
+        }
     });
+    
+    console.log('=== ' + mismatched.length + ' feeds with unread items ===');
 };
