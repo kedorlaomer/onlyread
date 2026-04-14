@@ -766,7 +766,13 @@ window.onlyreadDebug = function() {
     }
     console.log('=== ALL FEEDS ===');
     getFeeds(blobStore).forEach(f => {
+        let unreadCount = 0;
+        let readCount = 0;
+        f.items?.forEach(i => {
+            if (i.unread === false) readCount++;
+            else unreadCount++;
+        });
         console.log((f.title || f.url) + ' | ' + f.url);
-        console.log('  items:', f.items?.length || 0, '| first unread:', f.items?.[0]?.unread);
+        console.log('  total:', f.items?.length || 0, '| read:', readCount, '| unread:', unreadCount);
     });
 };
