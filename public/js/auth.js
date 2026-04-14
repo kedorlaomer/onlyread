@@ -768,6 +768,7 @@ window.onlyreadDebug = function() {
     });
     
     console.log('=== FEEDS IN UI (' + uiFeedTitles.size + ') ===');
+    uiFeedTitles.forEach(title => console.log(title));
     
     if (!blobStore) {
         console.log('blobStore not initialized');
@@ -783,10 +784,8 @@ window.onlyreadDebug = function() {
         if (feed) {
             let unreadCount = (feed.items || []).filter(i => i.unread !== false).length;
             let readCount = (feed.items || []).filter(i => i.unread === false).length;
+            console.log((feed.title || feed.url) + ' -> read:' + readCount + ' unread:' + unreadCount);
             if (unreadCount > 0) {
-                console.log('UNREAD:', feed.title || feed.url);
-                console.log('  URL:', feed.url);
-                console.log('  items:', feed.items?.length || 0, '| read:', readCount, '| unread:', unreadCount);
                 mismatched.push(feed.url);
             }
         }
