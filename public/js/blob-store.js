@@ -133,7 +133,7 @@ export function createBlobStore() {
     let blobAvailable = false;
     const pendingCallbacks = [];
     let syncTimeout = null;
-    const SYNC_DEBOUNCE_MS = 120000;
+    const SYNC_DEBOUNCE_MS = 500;
 
     function ensureReady() {
         return new Promise((resolve) => {
