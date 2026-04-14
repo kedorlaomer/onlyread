@@ -26,10 +26,22 @@ let blobStore = null;
 let feedWorker = null;
 let hideRead = false;
 let filteredFeedTitle = null;
+let renderItemsTimeout = null;
+const RENDER_DEBOUNCE_MS = 150;
 
 const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
+}
+
+function debouncedRenderItems() {
+    if (renderItemsTimeout) {
+        clearTimeout(renderItemsTimeout);
+    }
+    renderItemsTimeout = setTimeout(() => {
+        renderItemsTimeout = null;
+        renderItems();
+    }, RENDER_DEBOUNCE_MS);
 }
 
 function showPage(pageName) {
@@ -41,7 +53,7 @@ function showPage(pageName) {
     if (pageName === 'read') {
         navRead.classList.add('active');
         pageRead.classList.remove('hidden');
-        renderItems();
+        debouncedRenderItems();
     } else if (pageName === 'manage') {
         navManage.classList.add('active');
         pageManage.classList.remove('hidden');
@@ -62,7 +74,7 @@ const toggleReadBtn = document.getElementById('toggle-read-btn');
 toggleReadBtn.addEventListener('click', () => {
     hideRead = !hideRead;
     toggleReadBtn.textContent = hideRead ? 'Show Read' : 'Hide Read';
-    renderItems();
+    debouncedRenderItems();
 });
 
 function updateToggleFilterText() {
@@ -76,6 +88,7 @@ function updateToggleFilterText() {
 const syncBtn = document.getElementById('sync-btn');
 syncBtn.addEventListener('click', () => {
     blobStore.syncNow();
+    debouncedRenderItems();
 });
 
 function decodeJWT(token) {
@@ -439,7 +452,7 @@ function initFeedWorker(userId) {
                             updateFeedMeta(payload.feedUrl, result.title, result.link, blobStore);
                         }
                         renderFeeds();
-                        renderItems();
+                        debouncedRenderItems();
                     }
                     break;
                     
@@ -600,13 +613,36 @@ netlifyIdentity.on('login', async (user) => {
         console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
-        console.log('[Auth] Blob store initialized, displaying cached data immediately');
+console.log('[Auth] Blob store initialized, displaying cached data immediately');
         renderItems();
         renderFeeds();
         initFeedWorker(jwtPayload.sub);
     }
     console.log('[Auth] Calling updateUI');
     updateUI();
+});
+
+itemsContainer.addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-item-link]');
+    if (link) {
+        const itemLink = link.getAttribute('data-item-link');
+        const itemId = link.id;
+        if (itemId) {
+            history.replaceState(null, '', `#${itemId}`);
+        }
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if (!feed.items) continue;
+            for (const item of feed.items) {
+                if (item.link === itemLink && item.unread) {
+                    item.unread = false;
+                    blobStore.markItemReadState(feed.url, itemLink, true);
+                    break;
+                }
+            }
+        }
+        debouncedRenderItems();
+    }
 });
 
 netlifyIdentity.on('logout', () => {
@@ -689,7 +725,7 @@ itemsContainer.addEventListener('click', async (e) => {
             console.log('[Auth] After markFeedAsRead (100ms later), items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
             
             log('renderItems: about to render');
-            renderItems();
+            renderItems(); // Keep immediate after markFeedAsRead completes
             log('renderItems: finished');
         } else {
             console.log('[Auth] ERROR: Feed not found!');
@@ -711,7 +747,7 @@ itemsContainer.addEventListener('click', async (e) => {
                 }
             }
         }
-        renderItems();
+        debouncedRenderItems();
     }
 });
 
@@ -719,6 +755,6 @@ updateUI();
 
 window.addEventListener('onlyread:dataUpdated', () => {
     console.log('[Auth] Data updated from blob, re-rendering UI');
-    renderItems();
+    debouncedRenderItems();
     renderFeeds();
 });
