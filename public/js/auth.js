@@ -772,22 +772,21 @@ window.onlyreadDebug = function() {
         return;
     }
     
-    console.log('=== SIMPLE CHECK ===');
-    const feeds = getFeeds(blobStore);
-    const targetFeeds = ['Jan-Lukas Else', 'Astrodicticum Simplex', 'LOW←TECH MAGAZINE English'];
+    console.log('=== Check data sources for Jan-Lukas ===');
     
-    targetFeeds.forEach(title => {
-        const feed = feeds.find(f => f.title === title);
-        if (feed) {
-            console.log('--- ' + feed.title + ' ---');
-            console.log('URL:', feed.url);
-            console.log('items count:', feed.items?.length);
-            if (feed.items?.length > 0) {
-                console.log('item[0].unread:', feed.items[0].unread, 'type:', typeof feed.items[0].unread);
-                console.log('item[0]:', JSON.stringify(feed.items[0]).substring(0, 200));
-            }
-        } else {
-            console.log('NOT FOUND:', title);
-        }
-    });
+    // From getFeeds() function
+    const viaGetFeeds = getFeeds(blobStore);
+    const viaGet = viaGetFeeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
+    console.log('via getFeeds():', viaGet?.items?.length, 'items, first unread:', viaGet?.items?.[0]?.unread);
+    
+    // Direct from blobStore
+    const direct = blobStore.get('feeds');
+    const viaDirect = direct?.find(f => f.url === 'https://jlelse.blog/de/index.xml');
+    console.log('via blobStore.get():', viaDirect?.items?.length, 'items, first unread:', viaDirect?.items?.[0]?.unread);
+    
+    // Are they the same object?
+    console.log('Same object?', viaGet === viaDirect);
+    if (viaGet?.items && viaDirect?.items) {
+        console.log('via Get items === via Direct items:', viaGet.items === viaDirect.items);
+    }
 };
