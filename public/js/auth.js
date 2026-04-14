@@ -758,3 +758,18 @@ window.addEventListener('onlyread:dataUpdated', () => {
     debouncedRenderItems();
     renderFeeds();
 });
+
+window.onlyreadDebug = function() {
+    if (!blobStore) {
+        console.log('blobStore not initialized');
+        return;
+    }
+    console.log('Feeds with items:');
+    getFeeds(blobStore).forEach(f => {
+        if (f.items && f.items.length > 0) {
+            console.log(f.url || f.title);
+            console.log('  items:', f.items.length);
+            console.log('  first item unread:', f.items[0].unread, 'type:', typeof f.items[0].unread);
+        }
+    });
+};
