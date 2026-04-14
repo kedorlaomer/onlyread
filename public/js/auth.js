@@ -732,6 +732,13 @@ window.onlyreadDebug = function() {
     const feedsInUI = document.querySelectorAll('.filter-feed-link');
     console.log('=== Feeds displayed in UI ===');
     feedsInUI.forEach(link => {
-        console.log(link.getAttribute('data-feed-title'));
+        const title = link.getAttribute('data-feed-title');
+        if (blobStore) {
+            const feeds = getFeeds(blobStore);
+            const feed = feeds.find(f => f.title === title);
+            console.log(title + ' | ' + (feed?.url || '?'));
+        } else {
+            console.log(title);
+        }
     });
 };
