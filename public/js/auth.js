@@ -290,14 +290,9 @@ function renderItems() {
         const feedTitle = item.feedTitle;
         const dateStr = formatDate(item.pubDate);
         let titleHtml = '';
-        let contentHtml = '';
-        
-        // Special logging for Jan-Lukas feed
-        if (feedTitle && feedTitle.includes('Jan-Lukas')) {
-            console.log('[Auth] renderItems: Jan-Lukas item:', { link: item.link, unread: item.unread, type: typeof item.unread });
-        }
-        
-        if (item.description) {
+let contentHtml = '';
+         
+         if (item.description) {
             const cleanText = stripHtml(item.description);
             const words = cleanText.split(/\s+/);
             
@@ -323,14 +318,6 @@ function renderItems() {
 const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
 
         const itemClass = item.unread === false ? 'item read' : 'item';
-        
-        // Debug: check for specific feeds
-        if (!window._debugRender && ['Astrodicticum Simplex', 'Jan-Lukas Else', 'LOW←TECH MAGAZINE English'].includes(feedTitle)) {
-            console.log('RENDER:', feedTitle, '| unread:', item.unread, '| type:', typeof item.unread, '| class:', itemClass);
-            window._debugRender = window._debugRender || 0;
-            window._debugRender++;
-            if (window._debugRender >= 3) window._debugRender = null;
-        }
         
         return `
             <div class="${itemClass}">
@@ -613,19 +600,19 @@ exportTextBtn.addEventListener('click', () => {
 });
 
 netlifyIdentity.on('login', async (user) => {
-    console.log('[Auth] Login event fired, user:', user?.email);
+    if (DEBUG) console.log('[Auth] Login event fired, user:', user?.email);
     const jwtPayload = decodeJWT(user.token);
-    console.log('[Auth] JWT payload:', jwtPayload);
+    if (DEBUG) console.log('[Auth] JWT payload:', jwtPayload);
     if (jwtPayload?.sub) {
-        console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
+        if (DEBUG) console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
-console.log('[Auth] Blob store initialized, displaying cached data immediately');
+        if (DEBUG) console.log('[Auth] Blob store initialized, displaying cached data immediately');
         renderItems();
         renderFeeds();
         initFeedWorker(jwtPayload.sub);
     }
-    console.log('[Auth] Calling updateUI');
+    if (DEBUG) console.log('[Auth] Calling updateUI');
     updateUI();
 });
 
@@ -703,39 +690,15 @@ itemsContainer.addEventListener('click', async (e) => {
     if (markAllLink) {
         e.preventDefault();
         const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
-        log('Mark all as read clicked for:', clickedFeedTitle);
         if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
             return;
         }
         const feeds = getFeeds(blobStore);
-        log('All feeds titles:', feeds.map(f => ({ title: f.title, url: f.url })));
-        // Try matching by title OR by URL
         const feed = feeds.find(f => f.title === clickedFeedTitle || f.url === clickedFeedTitle);
-        log('Found feed:', feed);
-        console.log('[Auth] Feed items count:', feed.items?.length);
-        if (feed.items?.length > 0) {
-            console.log('[Auth] Feed items:', feed.items.map(i => ({ link: i.link.substring(0, 50), unread: i.unread === undefined ? 'undefined' : i.unread })));
-        }
         if (feed) {
-            console.log('[Auth] Before markFeedAsRead, items:', feed.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
-            console.log('[Auth] Calling markFeedAsRead with url:', feed.url);
             await blobStore.markFeedAsRead(feed.url);
-            // Check data immediately after
-            const feedsCheck1 = getFeeds(blobStore);
-            const feedCheck1 = feedsCheck1.find(f => f.url === feed.url);
-            console.log('[Auth] Immediate after markFeedAsRead:', feedCheck1?.items?.map(i => ({ link: i.link, unread: i.unread })));
-            
-            // Force sync to IndexedDB first
             await new Promise(r => setTimeout(r, 100));
-            const feedsAfter = getFeeds(blobStore);
-            const feedAfter = feedsAfter.find(f => f.url === feed.url);
-            console.log('[Auth] After markFeedAsRead (100ms later), items:', feedAfter?.items?.map(i => ({ link: i.link, unread: i.unread === undefined ? 'undefined' : i.unread })));
-            
-            log('renderItems: about to render');
-            renderItems(); // Keep immediate after markFeedAsRead completes
-            log('renderItems: finished');
-        } else {
-            console.log('[Auth] ERROR: Feed not found!');
+            renderItems();
         }
     }
 
@@ -761,33 +724,7 @@ itemsContainer.addEventListener('click', async (e) => {
 updateUI();
 
 window.addEventListener('onlyread:dataUpdated', () => {
-    console.log('[Auth] Data updated from blob, re-rendering UI');
+    if (DEBUG) console.log('[Auth] Data updated from blob, re-rendering UI');
     debouncedRenderItems();
     renderFeeds();
 });
-
-window.onlyreadDebug = function() {
-    if (!blobStore) {
-        console.log('blobStore not initialized');
-        return;
-    }
-    
-    console.log('=== FEEDS DISPLAYED IN UI ===');
-    const itemsInUI = document.querySelectorAll('.item');
-    const itemFeeds = document.querySelectorAll('.filter-feed-link');
-    itemFeeds.forEach(link => {
-        console.log(link.getAttribute('data-feed-title'));
-    });
-    
-    console.log('=== Check data sources ===');
-    
-    // From getFeeds() function
-    const viaGetFeeds = getFeeds(blobStore);
-    const viaGet = viaGetFeeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('Jan-Lukas via getFeeds():', viaGet?.items?.length, 'items, first unread:', viaGet?.items?.[0]?.unread);
-    
-    // Direct from blobStore
-    const direct = blobStore.get('feeds');
-    const viaDirect = direct?.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    console.log('Jan-Lukas via blobStore.get():', viaDirect?.items?.length, 'items, first unread:', viaDirect?.items?.[0]?.unread);
-};
