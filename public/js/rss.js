@@ -304,7 +304,7 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     }
     
     const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
-    log('addItemsToFeed: existing items count:', feeds[feedIndex].items.length, 'new items:', newItems.length);
+    console.log('[RSS] addItemsToFeed: URL:', feedUrl, 'existing:', feeds[feedIndex].items.length, 'new from server:', newItems.length);
     
     for (const item of newItems) {
         if (!existingLinks.has(item.link)) {
@@ -317,23 +317,25 @@ export function addItemsToFeed(feedUrl, newItems, store) {
                     const found = otherFeed.items.find(i => i.link === item.link);
                     if (found && found.unread !== undefined) {
                         existingItemUnread = found.unread;
-                        log('addItemsToFeed: found existing item in another feed, preserving unread:', existingItemUnread);
+                        console.log('[RSS] found in other feed, preserving:', existingItemUnread);
                         break;
                     }
                 }
             }
             
+            // Check if this is a REALLY new item or if we're getting all items from server each time
+            console.log('[RSS] NEW item:', item.link?.substring(0, 40), 'unread:', existingItemUnread);
+            
             feeds[feedIndex].items.push({
                 ...item,
                 unread: existingItemUnread
             });
-            log('addItemsToFeed: added new item:', item.link.substring(0, 50), 'unread:', existingItemUnread);
         } else {
             // Item already exists - preserve read state from local storage, don't overwrite with server's unread=true
             const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
             if (existingItem) {
-                log('addItemsToFeed: item exists, preserving local read state:', existingItem.unread);
-                // The existing item's unread state is already preserved - no action needed
+                // Ensure read state is preserved
+                console.log('[RSS] EXISTING item, preserving:', existingItem.unread);
             }
         }
     }
