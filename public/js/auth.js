@@ -364,6 +364,7 @@ function parseFeedItems(text) {
     if (rssItems.length > 0) {
         for (const item of rssItems) {
             const link = item.querySelector('link')?.textContent || '';
+            const guid = item.querySelector('guid')?.textContent || null;
             const title = item.querySelector('title')?.textContent || null;
             const pubDate = item.querySelector('pubDate')?.textContent || null;
             const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
@@ -373,6 +374,7 @@ function parseFeedItems(text) {
             if (link) {
                 items.push({
                     link,
+                    guid,
                     title,
                     pubDate,
                     enclosure,
@@ -395,6 +397,7 @@ function parseFeedItems(text) {
     for (const entry of atomEntries) {
         const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
         const link = linkEl?.getAttribute('href') || '';
+        const guid = entry.querySelector('id')?.textContent || null;
         const pubDate = entry.querySelector('published')?.textContent || 
                        entry.querySelector('updated')?.textContent || null;
         const title = entry.querySelector('title')?.textContent || null;
@@ -405,6 +408,7 @@ function parseFeedItems(text) {
         if (link) {
             items.push({
                 link,
+                guid,
                 title,
                 pubDate,
                 enclosure,

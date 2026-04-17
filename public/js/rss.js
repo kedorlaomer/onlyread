@@ -250,12 +250,14 @@ export async function fetchFeedItems(feedUrl) {
         if (rssItems.length > 0) {
             for (const item of rssItems) {
                 const link = item.querySelector('link')?.textContent || '';
+                const guid = item.querySelector('guid')?.textContent || null;
                 const pubDate = item.querySelector('pubDate')?.textContent || null;
                 const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
                 
                 if (link) {
                     items.push({
                         link,
+                        guid,
                         pubDate,
                         enclosure,
                         unread: true,
@@ -271,6 +273,7 @@ export async function fetchFeedItems(feedUrl) {
         for (const entry of atomEntries) {
             const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
             const link = linkEl?.getAttribute('href') || '';
+            const guid = entry.querySelector('id')?.textContent || null;
             const pubDate = entry.querySelector('published')?.textContent || 
                            entry.querySelector('updated')?.textContent || null;
             const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
@@ -278,6 +281,7 @@ export async function fetchFeedItems(feedUrl) {
             if (link) {
                 items.push({
                     link,
+                    guid,
                     pubDate,
                     enclosure,
                     unread: true,
@@ -303,19 +307,25 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         feeds[feedIndex].items = [];
     }
     
-    const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
+    const existingItemMap = new Map();
+    for (const item of feeds[feedIndex].items) {
+        existingItemMap.set(item.link, item);
+        if (item.guid) {
+            existingItemMap.set(item.guid, item);
+        }
+    }
     
     let changed = false;
     
     for (const item of newItems) {
-        if (!existingLinks.has(item.link)) {
-            // Check if this item exists in any other feed - if so, preserve its read state
-            let existingItemUnread = item.unread; // default to what the server says
+        const existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
+        
+        if (!existingItem) {
+            let existingItemUnread = item.unread;
             
-            // Check other feeds for this item (in case it was moved between feeds)
             for (const otherFeed of feeds) {
                 if (otherFeed.items) {
-                    const found = otherFeed.items.find(i => i.link === item.link);
+                    const found = otherFeed.items.find(i => i.link === item.link || (item.guid && i.guid === item.guid));
                     if (found && found.unread !== undefined) {
                         existingItemUnread = found.unread;
                         break;
@@ -329,13 +339,10 @@ export function addItemsToFeed(feedUrl, newItems, store) {
             });
             changed = true;
         } else {
-            // Item already exists - ALWAYS preserve LOCAL read state
-            const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
-            // DO NOTHING - the existing item keeps its local unread state
+            // Item already exists - preserve LOCAL read state, do nothing
         }
     }
     
-    // Force immediate save
     if (changed) {
         store.set('feeds', feeds);
     }
