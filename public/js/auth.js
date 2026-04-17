@@ -256,7 +256,15 @@ function renderItems() {
     
     if (hideRead) {
         log('renderItems: hideRead is true, filtering');
+        const beforeCount = allItems.length;
         allItems = allItems.filter(item => item.unread !== false);
+        const filteredCount = beforeCount - allItems.length;
+        if (filteredCount > 0) {
+            log('renderItems: filtered out', filteredCount, 'read items');
+        }
+        // Debug: show exact unread values
+        const unreadValues = [...new Set(allItems.map(i => typeof i.unread + ':' + i.unread))];
+        log('renderItems: unread value types:', unreadValues);
     }
     
     if (filteredFeedTitle) {
