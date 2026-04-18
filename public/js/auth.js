@@ -279,22 +279,6 @@ function renderItems() {
         }
     }
     
-    // Special debug: check Jan-Lukas and Astrodicticum specifically
-    const jlFeed = feeds.find(f => f.title === 'Jan-Lukas Else');
-    if (jlFeed?.items) {
-        log('DEBUG: Jan-Lukas feed items with unread status:');
-        for (const item of jlFeed.items) {
-            log('  - link:', item.link, 'unread:', item.unread, 'guid:', item.guid);
-        }
-    }
-    const astroFeed = feeds.find(f => f.title === 'Astrodicticum Simplex');
-    if (astroFeed?.items) {
-        log('DEBUG: Astrodicticum feed items with unread status:');
-        for (const item of astroFeed.items) {
-            log('  - link:', item.link?.substring(0, 50), 'unread:', item.unread, 'guid:', item.guid?.substring(0, 30));
-        }
-    }
-    
     if (filteredFeedTitle) {
         allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
     }
@@ -304,11 +288,11 @@ function renderItems() {
     log('renderItems: hideRead:', hideRead);
     log('renderItems: All feed titles:', feeds.map(f => f.title || f.url));
     
-    // Special log for Jan-Lukas feed data
-    const jlFeed = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml');
-    log('renderItems: Jan-Lukas feed found:', !!jlFeed, 'items:', jlFeed?.items?.length);
-    if (jlFeed?.items) {
-        log('renderItems: Jan-Lukas items in feed:', jlFeed.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread })));
+    // Special log for Jan-Lukas feed data - find by URL
+    const jlFeedByUrl = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml' || f.url === 'https://janlukas.blog/de/index.xml');
+    log('renderItems: Jan-Lukas feed found:', !!jlFeedByUrl, 'items:', jlFeedByUrl?.items?.length);
+    if (jlFeedByUrl?.items) {
+        log('renderItems: Jan-Lukas items in feed:', jlFeedByUrl.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, guid: i.guid?.substring(0, 20) })));
     }
     
     if (allItems.length === 0) {
