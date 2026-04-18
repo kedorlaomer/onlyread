@@ -315,10 +315,16 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         }
     }
     
+    console.log('[RSS] addItemsToFeed for:', feeds[feedIndex].title || feedUrl);
+    console.log('[RSS] Existing items count:', feeds[feedIndex].items.length);
+    console.log('[RSS] New items count:', newItems.length);
+    
     let changed = false;
     
     for (const item of newItems) {
         const existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
+        
+        console.log('[RSS] Processing item:', item.link?.substring(0, 40), 'existingItem:', !!existingItem, 'existing unread:', existingItem?.unread);
         
         if (!existingItem) {
             let existingItemUnread = item.unread;
@@ -338,8 +344,10 @@ export function addItemsToFeed(feedUrl, newItems, store) {
                 unread: existingItemUnread
             });
             changed = true;
+            console.log('[RSS] Added NEW item with unread:', existingItemUnread);
         } else {
             // Item already exists - preserve LOCAL read state, do nothing
+            console.log('[RSS] Keeping existing item with unread:', existingItem.unread);
         }
     }
     
