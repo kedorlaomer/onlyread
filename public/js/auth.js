@@ -271,11 +271,27 @@ function renderItems() {
         const feedsWithItems = {};
         for (const item of allItems) {
             if (!feedsWithItems[item.feedTitle]) feedsWithItems[item.feedTitle] = [];
-            feedsWithItems[item.feedTitle].push(item.link?.substring(0, 50));
+            feedsWithItems[item.feedTitle].push({ link: item.link?.substring(0, 60), unread: item.unread });
         }
         const topFeeds = Object.keys(feedsWithItems).slice(0, 5);
         for (const f of topFeeds) {
-            log('renderItems: feed with items:', f, 'urls:', feedsWithItems[f].slice(0, 3));
+            log('renderItems: feed with items:', f, 'sample:', feedsWithItems[f].slice(0, 3));
+        }
+    }
+    
+    // Special debug: check Jan-Lukas and Astrodicticum specifically
+    const jlFeed = feeds.find(f => f.title === 'Jan-Lukas Else');
+    if (jlFeed?.items) {
+        log('DEBUG: Jan-Lukas feed items with unread status:');
+        for (const item of jlFeed.items) {
+            log('  - link:', item.link, 'unread:', item.unread, 'guid:', item.guid);
+        }
+    }
+    const astroFeed = feeds.find(f => f.title === 'Astrodicticum Simplex');
+    if (astroFeed?.items) {
+        log('DEBUG: Astrodicticum feed items with unread status:');
+        for (const item of astroFeed.items) {
+            log('  - link:', item.link?.substring(0, 50), 'unread:', item.unread, 'guid:', item.guid?.substring(0, 30));
         }
     }
     
@@ -765,4 +781,13 @@ window.onlyreadDebug = function() {
             console.log(title);
         }
     });
+    
+    // Additional debug: show all feeds and their URLs
+    if (blobStore) {
+        const feeds = getFeeds(blobStore);
+        console.log('\n=== All subscribed feeds ===');
+        feeds.forEach(f => {
+            console.log((f.title || 'Untitled') + ' | ' + f.url + ' | items: ' + (f.items?.length || 0));
+        });
+    }
 };
