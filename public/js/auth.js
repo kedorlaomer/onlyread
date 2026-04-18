@@ -295,6 +295,15 @@ function renderItems() {
         log('renderItems: Jan-Lukas items in feed:', jlFeedByUrl.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, guid: i.guid?.substring(0, 20) })));
     }
     
+    // Debug: Get raw data from blobStore to check what's actually stored
+    if (jlFeedByUrl) {
+        const rawFeeds = blobStore.get('feeds');
+        const rawJlFeed = rawFeeds?.find(f => f.url === 'https://jlelse.blog/de/index.xml' || f.url === 'https://janlukas.blog/de/index.xml');
+        if (rawJlFeed?.items) {
+            log('DEBUG raw from blobStore: Jan-Lukas items:', rawJlFeed.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread })));
+        }
+    }
+    
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
         return;
