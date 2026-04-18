@@ -300,12 +300,28 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     const feeds = store.get('feeds');
     if (!Array.isArray(feeds)) return;
     
-    const feedIndex = feeds.findIndex(f => f.url === feedUrl);
+    // Find feed by exact match OR by knownFeedUrls
+    let feedIndex = feeds.findIndex(f => f.url === feedUrl);
+    if (feedIndex === -1) {
+        // Check if this URL is known for any feed
+        for (let i = 0; i < feeds.length; i++) {
+            if (feeds[i].knownFeedUrls && feeds[i].knownFeedUrls.has(feedUrl)) {
+                feedIndex = i;
+                break;
+            }
+        }
+    }
     if (feedIndex === -1) return;
     
     if (!feeds[feedIndex].items) {
         feeds[feedIndex].items = [];
     }
+    
+    // Store canonical feed URLs if not already stored
+    if (!feeds[feedIndex].knownFeedUrls) {
+        feeds[feedIndex].knownFeedUrls = new Set();
+    }
+    feeds[feedIndex].knownFeedUrls.add(feedUrl);
     
     // Helper: normalize URL for matching (extract path, ignore domain)
     function normalizeUrl(url) {
@@ -318,13 +334,12 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     }
     
     const existingItemMap = new Map();
-    const existingPathMap = new Map(); // Map normalized path to item
+    const existingPathMap = new Map();
     for (const item of feeds[feedIndex].items) {
         existingItemMap.set(item.link, item);
         if (item.guid) {
             existingItemMap.set(item.guid, item);
         }
-        // Also map by normalized path for domain-migration cases
         const normalizedPath = normalizeUrl(item.link);
         existingPathMap.set(normalizedPath, item);
     }
@@ -332,14 +347,13 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     console.log('[RSS] addItemsToFeed for:', feeds[feedIndex].title || feedUrl);
     console.log('[RSS] Existing items count:', feeds[feedIndex].items.length);
     console.log('[RSS] New items count:', newItems.length);
+    console.log('[RSS] Known feed URLs:', [...feeds[feedIndex].knownFeedUrls]);
     
     let changed = false;
     
     for (const item of newItems) {
-        // Try exact match first
         let existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
         
-        // If no exact match, try by normalized path (handles domain migration)
         if (!existingItem) {
             const normalizedPath = normalizeUrl(item.link);
             existingItem = existingPathMap.get(normalizedPath);
@@ -370,7 +384,6 @@ export function addItemsToFeed(feedUrl, newItems, store) {
             changed = true;
             console.log('[RSS] Added NEW item with unread:', existingItemUnread);
         } else {
-            // Item already exists - preserve LOCAL read state, do nothing
             console.log('[RSS] Keeping existing item with unread:', existingItem.unread);
         }
     }
