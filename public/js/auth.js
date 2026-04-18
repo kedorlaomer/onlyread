@@ -29,7 +29,7 @@ let filteredFeedTitle = null;
 let renderItemsTimeout = null;
 const RENDER_DEBOUNCE_MS = 150;
 
-const DEBUG = false;
+const DEBUG = true;
 function log(...args) {
     if (DEBUG) console.log('[Auth]', ...args);
 }
