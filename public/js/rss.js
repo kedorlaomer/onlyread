@@ -307,12 +307,26 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         feeds[feedIndex].items = [];
     }
     
+    // Helper: normalize URL for matching (extract path, ignore domain)
+    function normalizeUrl(url) {
+        try {
+            const u = new URL(url);
+            return u.pathname + u.search;
+        } catch {
+            return url;
+        }
+    }
+    
     const existingItemMap = new Map();
+    const existingPathMap = new Map(); // Map normalized path to item
     for (const item of feeds[feedIndex].items) {
         existingItemMap.set(item.link, item);
         if (item.guid) {
             existingItemMap.set(item.guid, item);
         }
+        // Also map by normalized path for domain-migration cases
+        const normalizedPath = normalizeUrl(item.link);
+        existingPathMap.set(normalizedPath, item);
     }
     
     console.log('[RSS] addItemsToFeed for:', feeds[feedIndex].title || feedUrl);
@@ -322,7 +336,17 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     let changed = false;
     
     for (const item of newItems) {
-        const existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
+        // Try exact match first
+        let existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
+        
+        // If no exact match, try by normalized path (handles domain migration)
+        if (!existingItem) {
+            const normalizedPath = normalizeUrl(item.link);
+            existingItem = existingPathMap.get(normalizedPath);
+            if (existingItem) {
+                console.log('[RSS] Matched by path:', normalizedPath, 'existing unread:', existingItem.unread);
+            }
+        }
         
         console.log('[RSS] Processing item:', item.link?.substring(0, 40), 'existingItem:', !!existingItem, 'existing unread:', existingItem?.unread);
         
