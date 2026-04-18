@@ -300,7 +300,6 @@ export function addItemsToFeed(feedUrl, newItems, store) {
     const feeds = store.get('feeds');
     if (!Array.isArray(feeds)) return;
     
-    // Find feed by exact URL match only
     const feedIndex = feeds.findIndex(f => f.url === feedUrl);
     if (feedIndex === -1) return;
     
@@ -308,38 +307,20 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         feeds[feedIndex].items = [];
     }
     
-    // Match by exact link OR guid only
-    const existingItemMap = new Map();
-    for (const item of feeds[feedIndex].items) {
-        existingItemMap.set(item.link, item);
-        if (item.guid) {
-            existingItemMap.set(item.guid, item);
-        }
-    }
+    const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
     
     let changed = false;
     
     for (const item of newItems) {
-        const existingItem = existingItemMap.get(item.link) || (item.guid ? existingItemMap.get(item.guid) : null);
-        
-        if (!existingItem) {
-            let existingItemUnread = item.unread;
-            
-            for (const otherFeed of feeds) {
-                if (otherFeed.items) {
-                    const found = otherFeed.items.find(i => i.link === item.link || (item.guid && i.guid === item.guid));
-                    if (found && found.unread !== undefined) {
-                        existingItemUnread = found.unread;
-                        break;
-                    }
-                }
-            }
-            
+        if (!existingLinks.has(item.link)) {
             feeds[feedIndex].items.push({
                 ...item,
-                unread: existingItemUnread
+                unread: item.unread
             });
             changed = true;
+        } else {
+            // Item already exists - preserve local read state
+            const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
         }
     }
     

@@ -241,8 +241,6 @@ function renderItems() {
             });
         }
     }
-    log('renderItems: total items before filter:', allItems.length);
-    log('renderItems: sample items:', allItems.slice(0, 3).map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, unreadType: typeof i.unread })));
     
     // Sort by pubDate descending
     allItems.sort((a, b) => {
@@ -255,54 +253,22 @@ function renderItems() {
     });
     
     if (hideRead) {
-        log('renderItems: hideRead is true, filtering');
-        const beforeCount = allItems.length;
         allItems = allItems.filter(item => item.unread !== false);
-        const filteredCount = beforeCount - allItems.length;
-        if (filteredCount > 0) {
-            log('renderItems: filtered out', filteredCount, 'read items');
-        }
-        const unreadValues = [...new Set(allItems.map(i => typeof i.unread + ':' + i.unread))];
-        log('renderItems: unread value types:', unreadValues);
-    }
-    
-    // Debug: show feeds with read items being shown
-    if (allItems.length > 0) {
-        const feedsWithItems = {};
-        for (const item of allItems) {
-            if (!feedsWithItems[item.feedTitle]) feedsWithItems[item.feedTitle] = [];
-            feedsWithItems[item.feedTitle].push({ link: item.link?.substring(0, 60), unread: item.unread });
-        }
-        const topFeeds = Object.keys(feedsWithItems).slice(0, 5);
-        for (const f of topFeeds) {
-            log('renderItems: feed with items:', f, 'sample:', feedsWithItems[f].slice(0, 3));
-        }
     }
     
     if (filteredFeedTitle) {
         allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
     }
     
-    log('renderItems: total items after filter:', allItems.length);
-    log('renderItems: filteredFeedTitle:', filteredFeedTitle);
-    log('renderItems: hideRead:', hideRead);
-    log('renderItems: All feed titles:', feeds.map(f => f.title || f.url));
-    
-    // Special log for Jan-Lukas feed data - find by URL
-    const jlFeedByUrl = feeds.find(f => f.url === 'https://jlelse.blog/de/index.xml' || f.url === 'https://janlukas.blog/de/index.xml');
-    log('renderItems: Jan-Lukas feed found:', !!jlFeedByUrl, 'items:', jlFeedByUrl?.items?.length);
-    if (jlFeedByUrl?.items) {
-        log('renderItems: Jan-Lukas items in feed:', jlFeedByUrl.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, guid: i.guid?.substring(0, 20) })));
+    function simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
     }
-    
-    // Debug: Get raw data from blobStore to check what's actually stored
-    if (jlFeedByUrl) {
-        const rawFeeds = blobStore.get('feeds');
-        const rawJlFeed = rawFeeds?.find(f => f.url === 'https://jlelse.blog/de/index.xml' || f.url === 'https://janlukas.blog/de/index.xml');
-        if (rawJlFeed?.items) {
-            log('DEBUG raw from blobStore: Jan-Lukas items:', rawJlFeed.items.map(i => ({ link: i.link?.substring(0, 30), unread: i.unread })));
-        }
-    }
+    return Math.abs(hash).toString(36);
+}
     
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
