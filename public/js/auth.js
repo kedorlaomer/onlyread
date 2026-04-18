@@ -262,9 +262,21 @@ function renderItems() {
         if (filteredCount > 0) {
             log('renderItems: filtered out', filteredCount, 'read items');
         }
-        // Debug: show exact unread values
         const unreadValues = [...new Set(allItems.map(i => typeof i.unread + ':' + i.unread))];
         log('renderItems: unread value types:', unreadValues);
+    }
+    
+    // Debug: show feeds with read items being shown
+    if (allItems.length > 0) {
+        const feedsWithItems = {};
+        for (const item of allItems) {
+            if (!feedsWithItems[item.feedTitle]) feedsWithItems[item.feedTitle] = [];
+            feedsWithItems[item.feedTitle].push(item.link?.substring(0, 50));
+        }
+        const topFeeds = Object.keys(feedsWithItems).slice(0, 5);
+        for (const f of topFeeds) {
+            log('renderItems: feed with items:', f, 'urls:', feedsWithItems[f].slice(0, 3));
+        }
     }
     
     if (filteredFeedTitle) {
