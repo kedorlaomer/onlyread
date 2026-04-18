@@ -237,7 +237,7 @@ function renderItems() {
             allItems.push({
                 ...item,
                 feedTitle: feed.title || feed.url,
-                feedLink: feed.link
+                feedUrl: feed.url
             });
         }
     }
@@ -312,13 +312,14 @@ let contentHtml = '';
         
 const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
 
-        const itemClass = item.unread === false ? 'item read' : 'item';
+const itemClass = item.unread === false ? 'item read' : 'item';
+        const feedUrl = item.feedUrl || '';
         
         return `
             <div class="${itemClass}">
                 <div class="item-meta">
                     <span class="item-date">${dateStr}</span>
-                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
+                    <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" data-feed-url="${escapeHtml(feedUrl)}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" data-feed-url="${escapeHtml(feedUrl)}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
                 </div>
                 <div class="item-title">
                     <a href="${escapeHtml(item.link)}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${escapeHtml(item.link)}">${titleHtml}</a>
@@ -674,7 +675,11 @@ itemsContainer.addEventListener('click', async (e) => {
     const filterLink = e.target.closest('a.filter-feed-link');
     if (filterLink) {
         e.preventDefault();
-        const clickedFeedTitle = filterLink.getAttribute('data-feed-title');
+        const clickedFeedUrl = filterLink.getAttribute('data-feed-url');
+        const feeds = getFeeds(blobStore);
+        const feed = feeds.find(f => f.url === clickedFeedUrl);
+        const clickedFeedTitle = feed?.title || clickedFeedUrl;
+        
         if (filteredFeedTitle === clickedFeedTitle) {
             filteredFeedTitle = null;
         } else {
@@ -688,17 +693,22 @@ itemsContainer.addEventListener('click', async (e) => {
     const markAllLink = e.target.closest('a.mark-all-read-link');
     if (markAllLink) {
         e.preventDefault();
-        const clickedFeedTitle = markAllLink.getAttribute('data-feed-title');
-        if (!confirm(`Mark all items in "${clickedFeedTitle}" as read?`)) {
+        const clickedFeedUrl = markAllLink.getAttribute('data-feed-url');
+        if (!clickedFeedUrl) {
             return;
         }
         const feeds = getFeeds(blobStore);
-        const feed = feeds.find(f => f.title === clickedFeedTitle || f.url === clickedFeedTitle);
-        if (feed) {
-            await blobStore.markFeedAsRead(feed.url);
-            await new Promise(r => setTimeout(r, 100));
-            renderItems();
+        const feed = feeds.find(f => f.url === clickedFeedUrl);
+        if (!feed) {
+            console.error('Feed not found for URL:', clickedFeedUrl);
+            return;
         }
+        if (!confirm(`Mark all items in "${feed.title || clickedFeedUrl}" as read?`)) {
+            return;
+        }
+        await blobStore.markFeedAsRead(feed.url);
+        await new Promise(r => setTimeout(r, 100));
+        renderItems();
     }
 
     const markUnreadLink = e.target.closest('a.mark-unread-link');
