@@ -1,8 +1,3 @@
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[BlobStore]', ...args);
-}
-
 const DB_NAME = 'onlyread';
 const DB_VERSION = 1;
 const STORE_NAME = 'data';
@@ -19,13 +14,11 @@ function openDB() {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
         
         request.onerror = () => {
-            log('IndexedDB open error:', request.error);
             reject(request.error);
         };
         
         request.onsuccess = () => {
             db = request.result;
-            log('IndexedDB opened');
             resolve(db);
         };
         
@@ -126,7 +119,6 @@ function getStorageKey(userId, key) {
 }
 
 export function createBlobStore() {
-    const siteId = window.NETLIFY_IDENTITY ? window.NETLIFY_IDENTITY.site : null;
     let worker = null;
     let currentUserId = null;
     let ready = false;
@@ -154,7 +146,6 @@ export function createBlobStore() {
 
     return {
         async init(userId) {
-            log('init() called with userId:', userId);
             if (!validateUUID(userId)) {
                 throw new Error(`Invalid UUID: ${userId}`);
             }
@@ -162,16 +153,13 @@ export function createBlobStore() {
 
             try {
                 await openDB();
-                log('IndexedDB opened, loading data...');
                 const allData = await dbGetAllForUser(userId);
-                log('Loaded from IndexedDB:', Object.keys(allData));
                 for (const [key, value] of Object.entries(allData)) {
                     const storageKey = getStorageKey(userId, key);
                     memoryCache[storageKey] = value;
                 }
                 blobAvailable = true;
             } catch (e) {
-                log('IndexedDB not available:', e);
                 blobAvailable = false;
             }
 
@@ -184,29 +172,15 @@ export function createBlobStore() {
                     case 'ready':
                         blobAvailable = e.data.blobAvailable;
                         ready = true;
-                        log('Store ready, blob available:', blobAvailable);
                         processPendingCallbacks();
                         break;
 
                     case 'syncFromBlob':
                         (async () => {
-                            log('syncFromBlob received, data keys:', Object.keys(data));
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
-                                const oldValue = memoryCache[storageKey];
                                 memoryCache[storageKey] = value;
                                 await dbSet(storageKey, value);
-                            }
-                            log('Initialized from blob:', Object.keys(data));
-                            // Log the feeds to see their state
-                            const feeds = memoryCache[getStorageKey(userId, 'feeds')];
-                            if (feeds && Array.isArray(feeds)) {
-                                for (const feed of feeds.slice(0, 5)) {
-                                    log('syncFromBlob: feed:', feed.title || feed.url, 'items count:', feed.items?.length);
-                                    if (feed.items && feed.items.length > 0) {
-                                        log('syncFromBlob: sample item unread states:', feed.items.slice(0, 3).map(i => ({ link: i.link?.substring(0, 30), unread: i.unread, type: typeof i.unread })));
-                                    }
-                                }
                             }
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                         })();
@@ -226,14 +200,13 @@ export function createBlobStore() {
                         break;
 
                     case 'synced':
-                        log('Sync complete');
                         break;
                 }
             };
 
             worker.postMessage({
                 type: 'init',
-                payload: { userId, siteId }
+                payload: { userId }
             });
 
             await ensureReady();
@@ -249,7 +222,6 @@ export function createBlobStore() {
             if (!currentUserId) throw new Error('Store not initialized');
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
-            log('set() called for key:', key, 'cache size:', JSON.stringify(memoryCache).length);
             
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
@@ -262,7 +234,6 @@ export function createBlobStore() {
                     dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
                 }
                 
-                log('Scheduling sync for', keysToSync.length, 'keys, total size:', JSON.stringify(dataToSync).length);
                 if (worker) {
                     worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
                 }
@@ -320,8 +291,6 @@ export function createBlobStore() {
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
             if (feedIndex === -1) return;
 
-            log('markFeedAsRead: Before update, items:', feeds[feedIndex]?.items?.map(i => ({ link: i.link, unread: i.unread })));
-            
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
                     item.unread = false;
@@ -330,15 +299,11 @@ export function createBlobStore() {
             
             memoryCache[feedsKey] = feeds;
             await dbSet(feedsKey, feeds);
-            log('markFeedAsRead: After update, items:', feeds[feedIndex]?.items?.map(i => ({ link: i.link, unread: i.unread })));
             if (worker) {
-                log('markFeedAsRead: Posting worker message, feedUrl:', feedUrl);
                 worker.postMessage({
                     type: 'markAllRead',
                     payload: { feedUrl }
                 });
-            } else {
-                log('markFeedAsRead: ERROR - worker is null!');
             }
         },
 

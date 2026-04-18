@@ -1,8 +1,85 @@
 import { fetchFeedBatch } from './fetch-feed.js';
 
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[RSS]', ...args);
+function unescapeXml(text) {
+    if (!text) return null;
+    return text
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'");
+}
+
+export function parseFeedItems(text) {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'application/xml');
+    
+    const items = [];
+    
+    const channel = xml.querySelector('channel');
+    const feedTitle = channel?.querySelector('title')?.textContent || null;
+    const feedLinkEl = channel?.querySelector('link');
+    const feedLink = feedLinkEl?.textContent || feedLinkEl?.getAttribute('href') || null;
+    
+    const rssItems = xml.querySelectorAll('item');
+    if (rssItems.length > 0) {
+        for (const item of rssItems) {
+            const link = item.querySelector('link')?.textContent || '';
+            const guid = item.querySelector('guid')?.textContent || null;
+            const title = item.querySelector('title')?.textContent || null;
+            const pubDate = item.querySelector('pubDate')?.textContent || null;
+            const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
+            const descriptionEl = item.querySelector('description');
+            const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
+            
+            if (link) {
+                items.push({
+                    link,
+                    guid,
+                    title,
+                    pubDate,
+                    enclosure,
+                    description,
+                    unread: true,
+                    addedDate: new Date().toISOString()
+                });
+            }
+        }
+        return { items, title: feedTitle, link: feedLink };
+    }
+    
+    const atomFeed = xml.querySelector('feed');
+    const atomTitle = atomFeed?.querySelector('title')?.textContent || feedTitle;
+    const atomLinkEl = atomFeed?.querySelector('link[rel="alternate"]') || atomFeed?.querySelector('link');
+    const atomLink = atomLinkEl?.getAttribute('href') || feedLink;
+    
+    const atomEntries = xml.querySelectorAll('entry');
+    for (const entry of atomEntries) {
+        const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
+        const link = linkEl?.getAttribute('href') || '';
+        const guid = entry.querySelector('id')?.textContent || null;
+        const pubDate = entry.querySelector('published')?.textContent || 
+                       entry.querySelector('updated')?.textContent || null;
+        const title = entry.querySelector('title')?.textContent || null;
+        const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
+        const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
+        const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
+        
+        if (link) {
+            items.push({
+                link,
+                guid,
+                title,
+                pubDate,
+                enclosure,
+                description,
+                unread: true,
+                addedDate: new Date().toISOString()
+            });
+        }
+    }
+    
+    return { items, title: atomTitle, link: atomLink };
 }
 
 export function validateUrl(string) {

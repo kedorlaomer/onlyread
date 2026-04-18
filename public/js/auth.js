@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta } from './rss.js';
+import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -28,11 +28,6 @@ let hideRead = false;
 let filteredFeedTitle = null;
 let renderItemsTimeout = null;
 const RENDER_DEBOUNCE_MS = 150;
-
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[Auth]', ...args);
-}
 
 function debouncedRenderItems() {
     if (renderItemsTimeout) {
@@ -210,6 +205,10 @@ function getItemId(item) {
     return simpleHash(item.link);
 }
 
+function getItemIdFromLink(link) {
+    return simpleHash(link);
+}
+
 function markItemAsRead(item, blobStore) {
     const feeds = getFeeds(blobStore);
     for (const feed of feeds) {
@@ -228,7 +227,6 @@ function renderItems() {
     if (!blobStore) return;
     try {
     const feeds = getFeeds(blobStore);
-    log('renderItems: feeds count:', feeds.length);
     
     let allItems = [];
     for (const feed of feeds) {
@@ -260,16 +258,6 @@ function renderItems() {
         allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
     }
     
-    function simpleHash(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36);
-}
-    
     if (allItems.length === 0) {
         itemsContainer.innerHTML = '<p>No items yet.</p>';
         return;
@@ -292,18 +280,24 @@ let contentHtml = '';
             const words = cleanText.split(/\s+/);
             
             if (item.title) {
-                // Has title: show title, then content
                 titleHtml = item.title;
                 if (words.length > 0) {
                     contentHtml = words.slice(0, 100).join(' ');
-                    if (words.length > 100) contentHtml += '...';
+                    if (words.length > 100) {
+                        const remainingText = words.slice(100).join(' ');
+                        contentHtml += ` <a href="#" class="show-more-link" data-item-link="${item.link}" data-remaining-text="${escapeHtml(remainingText)}" title="Show more">...</a>`;
+                    }
                 }
             } else {
-                // No title: show first words as title, then rest as content
                 titleHtml = words.slice(0, 15).join(' ') + '...';
                 if (words.length > 15) {
-                    contentHtml = '...' + words.slice(15, 100).join(' ');
-                    if (words.length > 100) contentHtml += '...';
+                    contentHtml = words.slice(15, 100).join(' ');
+                    if (words.length > 100) {
+                        const remainingText = words.slice(100).join(' ');
+                        contentHtml += ` <a href="#" class="show-more-link" data-item-link="${item.link}" data-remaining-text="${escapeHtml(remainingText)}" title="Show more">...</a>`;
+                    } else {
+                        contentHtml = '...' + contentHtml;
+                    }
                 }
             }
         } else {
@@ -328,94 +322,8 @@ const itemClass = item.unread === false ? 'item read' : 'item';
             </div>
         `;
     }).join('') + '</div>';
-    log('renderItems: finished successfully');
     } catch (e) {
-        console.error('[Auth] renderItems: ERROR:', e);
     }
-}
-
-function unescapeXml(text) {
-    if (!text) return null;
-    return text
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&apos;/g, "'");
-}
-
-function parseFeedItems(text) {
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, 'application/xml');
-    
-    const items = [];
-    
-    // Get feed metadata
-    const channel = xml.querySelector('channel');
-    const feedTitle = channel?.querySelector('title')?.textContent || null;
-    const feedLinkEl = channel?.querySelector('link');
-    const feedLink = feedLinkEl?.textContent || feedLinkEl?.getAttribute('href') || null;
-    
-    const rssItems = xml.querySelectorAll('item');
-    if (rssItems.length > 0) {
-        for (const item of rssItems) {
-            const link = item.querySelector('link')?.textContent || '';
-            const guid = item.querySelector('guid')?.textContent || null;
-            const title = item.querySelector('title')?.textContent || null;
-            const pubDate = item.querySelector('pubDate')?.textContent || null;
-            const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
-            const descriptionEl = item.querySelector('description');
-            const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
-            
-            if (link) {
-                items.push({
-                    link,
-                    guid,
-                    title,
-                    pubDate,
-                    enclosure,
-                    description,
-                    unread: true,
-                    addedDate: new Date().toISOString()
-                });
-            }
-        }
-        return { items, title: feedTitle, link: feedLink };
-    }
-    
-    // Atom format
-    const atomFeed = xml.querySelector('feed');
-    const atomTitle = atomFeed?.querySelector('title')?.textContent || feedTitle;
-    const atomLinkEl = atomFeed?.querySelector('link[rel="alternate"]') || atomFeed?.querySelector('link');
-    const atomLink = atomLinkEl?.getAttribute('href') || feedLink;
-    
-    const atomEntries = xml.querySelectorAll('entry');
-    for (const entry of atomEntries) {
-        const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-        const link = linkEl?.getAttribute('href') || '';
-        const guid = entry.querySelector('id')?.textContent || null;
-        const pubDate = entry.querySelector('published')?.textContent || 
-                       entry.querySelector('updated')?.textContent || null;
-        const title = entry.querySelector('title')?.textContent || null;
-        const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
-        const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
-        const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
-        
-        if (link) {
-            items.push({
-                link,
-                guid,
-                title,
-                pubDate,
-                enclosure,
-                description,
-                unread: true,
-                addedDate: new Date().toISOString()
-            });
-        }
-    }
-    
-    return { items, title: atomTitle, link: atomLink };
 }
 
 function initFeedWorker(userId) {
@@ -423,7 +331,6 @@ function initFeedWorker(userId) {
         feedWorker.terminate();
     }
     
-    console.log('[Auth] Initializing feed worker...');
     feedWorker = new Worker('js/feed-worker.js', { type: 'module' });
     
         feedWorker.onmessage = (e) => {
@@ -431,7 +338,6 @@ function initFeedWorker(userId) {
             
             switch (type) {
                 case 'ready':
-                    console.log('[Auth] Feed worker ready');
                     break;
                 case 'getFeeds':
                     const feeds = blobStore.get('feeds') || [];
@@ -460,7 +366,6 @@ function initFeedWorker(userId) {
         type: 'init',
         payload: { userId }
     });
-    console.log('[Auth] Feed worker initialized, waiting for ready...');
 }
 
 function stopFeedWorker() {
@@ -600,19 +505,14 @@ exportTextBtn.addEventListener('click', () => {
 });
 
 netlifyIdentity.on('login', async (user) => {
-    if (DEBUG) console.log('[Auth] Login event fired, user:', user?.email);
     const jwtPayload = decodeJWT(user.token);
-    if (DEBUG) console.log('[Auth] JWT payload:', jwtPayload);
     if (jwtPayload?.sub) {
-        if (DEBUG) console.log('[Auth] Creating blob store for user:', jwtPayload.sub);
         blobStore = createBlobStore();
         await blobStore.init(jwtPayload.sub);
-        if (DEBUG) console.log('[Auth] Blob store initialized, displaying cached data immediately');
         renderItems();
         renderFeeds();
         initFeedWorker(jwtPayload.sub);
     }
-    if (DEBUG) console.log('[Auth] Calling updateUI');
     updateUI();
 });
 
@@ -648,29 +548,6 @@ netlifyIdentity.on('logout', () => {
     updateUI();
 });
 
-itemsContainer.addEventListener('click', (e) => {
-    const link = e.target.closest('a[data-item-link]');
-    if (link) {
-        const itemLink = link.getAttribute('data-item-link');
-        const itemId = link.id;
-        if (itemId) {
-            history.replaceState(null, '', `#${itemId}`);
-        }
-        const feeds = getFeeds(blobStore);
-        for (const feed of feeds) {
-            if (!feed.items) continue;
-            for (const item of feed.items) {
-                if (item.link === itemLink && item.unread) {
-                    item.unread = false;
-                    blobStore.markItemReadState(feed.url, itemLink, true);
-                    break;
-                }
-            }
-        }
-        renderItems();
-    }
-});
-
 itemsContainer.addEventListener('click', async (e) => {
     const filterLink = e.target.closest('a.filter-feed-link');
     if (filterLink) {
@@ -700,7 +577,6 @@ itemsContainer.addEventListener('click', async (e) => {
         const feeds = getFeeds(blobStore);
         const feed = feeds.find(f => f.url === clickedFeedUrl);
         if (!feed) {
-            console.error('Feed not found for URL:', clickedFeedUrl);
             return;
         }
         if (!confirm(`Mark all items in "${feed.title || clickedFeedUrl}" as read?`)) {
@@ -728,6 +604,28 @@ itemsContainer.addEventListener('click', async (e) => {
         }
         debouncedRenderItems();
     }
+
+    const showMoreLink = e.target.closest('a.show-more-link');
+    if (showMoreLink) {
+        e.preventDefault();
+        const clickedItemLink = showMoreLink.getAttribute('data-item-link');
+        const itemId = getItemIdFromLink(clickedItemLink);
+        if (itemId) {
+            history.replaceState(null, '', `#${itemId}`);
+        }
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if (!feed.items) continue;
+            for (const item of feed.items) {
+                if (item.link === clickedItemLink) {
+                    item.unread = false;
+                    blobStore.markItemReadState(feed.url, clickedItemLink, true);
+                    break;
+                }
+            }
+        }
+        debouncedRenderItems();
+    }
 });
 
 updateUI();
@@ -736,27 +634,3 @@ window.addEventListener('onlyread:dataUpdated', () => {
     debouncedRenderItems();
     renderFeeds();
 });
-
-window.onlyreadDebug = function() {
-    const feedsInUI = document.querySelectorAll('.filter-feed-link');
-    console.log('=== Feeds displayed in UI ===');
-    feedsInUI.forEach(link => {
-        const title = link.getAttribute('data-feed-title');
-        if (blobStore) {
-            const feeds = getFeeds(blobStore);
-            const feed = feeds.find(f => f.title === title);
-            console.log(title + ' | ' + (feed?.url || '?'));
-        } else {
-            console.log(title);
-        }
-    });
-    
-    // Additional debug: show all feeds and their URLs
-    if (blobStore) {
-        const feeds = getFeeds(blobStore);
-        console.log('\n=== All subscribed feeds ===');
-        feeds.forEach(f => {
-            console.log((f.title || 'Untitled') + ' | ' + f.url + ' | items: ' + (f.items?.length || 0));
-        });
-    }
-};

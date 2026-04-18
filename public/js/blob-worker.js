@@ -1,18 +1,7 @@
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[BlobWorker]', ...args);
-}
-
 let userId = null;
-let siteId = null;
 let syncInterval = null;
 let blobAvailable = false;
 let isSyncing = false;
-
-function validateUUID(uuid) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
-}
 
 async function checkBlobAvailability() {
     try {
@@ -32,7 +21,6 @@ async function syncFromBlob() {
         const limit = 50;
         let hasMore = true;
         
-        // Fetch feeds in pages
         while (hasMore) {
             const response = await fetch(`/.netlify/functions/store/${userId}?offset=${offset}&limit=${limit}`);
             if (response.status === 404) return;
@@ -44,32 +32,24 @@ async function syncFromBlob() {
                 allFeeds = allFeeds.concat(data.feeds);
                 hasMore = data.hasMore;
                 offset += limit;
-                log('syncFromBlob: fetched page, offset:', offset, 'total:', data.total);
             } else {
                 hasMore = false;
             }
         }
         
         if (allFeeds.length > 0) {
-            log('syncFromBlob: loaded', allFeeds.length, 'feeds');
             self.postMessage({ type: 'syncFromBlob', data: { feeds: allFeeds } });
         }
     } catch (e) {
-        log('syncFromBlob error:', e.message);
     }
 }
 
-const BATCH_SIZE_BYTES = 1024 * 1024; // 1MB
+const BATCH_SIZE_BYTES = 1024 * 1024;
 
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
-    const dataString = JSON.stringify(data);
-    const dataSize = dataString.length;
-    log('syncToBlob called, data size:', dataSize, 'keys:', Object.keys(data));
-    
     const keys = Object.keys(data);
-    let batchCount = 0;
     
     for (const key of keys) {
         const value = data[key];
@@ -82,23 +62,11 @@ async function syncToBlob(data) {
                 const feedSize = JSON.stringify(feed).length;
                 
                 if (currentBatchSize + feedSize > BATCH_SIZE_BYTES && currentBatch.length > 0) {
-                    batchCount++;
-                    log('syncToBlob: sending batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
-                    
-                    try {
-                        const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ feeds: currentBatch })
-                        });
-                        
-                        if (!response.ok) {
-                            const text = await response.text();
-                            log('syncToBlob batch error:', text);
-                        }
-                    } catch (e) {
-                        log('syncToBlob batch failed:', e.message);
-                    }
+                    await fetch(`/.netlify/functions/store/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ feeds: currentBatch })
+                    });
                     
                     currentBatch = [];
                     currentBatchSize = 0;
@@ -109,45 +77,21 @@ async function syncToBlob(data) {
             }
             
             if (currentBatch.length > 0) {
-                batchCount++;
-                log('syncToBlob: sending final batch', batchCount, 'with', currentBatch.length, 'feeds, size:', JSON.stringify(currentBatch).length);
-                
-                try {
-                    const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ feeds: currentBatch })
-                    });
-                    
-                    if (!response.ok) {
-                        const text = await response.text();
-                        log('syncToBlob batch error:', text);
-                    }
-                } catch (e) {
-                    log('syncToBlob batch failed:', e.message);
-                }
-            }
-        } else {
-            log('syncToBlob: sending', key);
-            
-            try {
-                const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                await fetch(`/.netlify/functions/store/${userId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [key]: value })
+                    body: JSON.stringify({ feeds: currentBatch })
                 });
-                
-                if (!response.ok) {
-                    const text = await response.text();
-                    log('syncToBlob error:', text);
-                }
-            } catch (e) {
-                log('syncToBlob failed:', e.message);
             }
+        } else {
+            await fetch(`/.netlify/functions/store/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [key]: value })
+            });
         }
     }
     
-    log('syncToBlob: complete,', batchCount, 'batches sent');
     self.postMessage({ type: 'synced' });
 }
 
@@ -155,7 +99,7 @@ function startSync() {
     if (syncInterval) return;
     syncInterval = setInterval(() => {
         self.postMessage({ type: 'requestData' });
-    }, 3600000); // 1 hour
+    }, 3600000);
 }
 
 function stopSync() {
@@ -171,7 +115,6 @@ self.onmessage = async function(e) {
     switch (type) {
         case 'init':
             userId = payload.userId;
-            siteId = payload.siteId;
             await checkBlobAvailability();
             self.postMessage({ type: 'ready', blobAvailable });
             await syncFromBlob();
@@ -180,7 +123,6 @@ self.onmessage = async function(e) {
 
         case 'sync':
             if (isSyncing) {
-                log('syncToBlob: already syncing, skipping');
                 return;
             }
             isSyncing = true;
@@ -192,25 +134,16 @@ self.onmessage = async function(e) {
             break;
 
         case 'markAllRead':
-            log('markAllRead received, payload:', payload);
             if (!userId || !blobAvailable) {
-                log('markAllRead skipped: userId or blobAvailable not ready');
                 return;
             }
             try {
-                log('markAllRead: Making request to backend, userId:', userId);
-                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'markAllRead' })
                 });
-                log('markAllRead: Response status:', response.status);
-                if (!response.ok) {
-                    const text = await response.text();
-                    log('markAllRead error:', text);
-                }
             } catch (e) {
-                log('markAllRead failed:', e.message);
             }
             break;
 
@@ -219,17 +152,12 @@ self.onmessage = async function(e) {
             if (!userId || !blobAvailable) return;
             try {
                 const isRead = type === 'markItemRead';
-                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: isRead ? 'markItemRead' : 'markItemUnread', itemLink: payload.itemLink })
                 });
-                if (!response.ok) {
-                    const text = await response.text();
-                    log('markItem error:', text);
-                }
             } catch (e) {
-                log('markItem failed:', e.message);
             }
             break;
 

@@ -1,8 +1,3 @@
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[FetchFeed]', ...args);
-}
-
 export async function fetchFeedBatch(urls) {
     if (!Array.isArray(urls)) urls = [urls];
     if (urls.length === 0) return { results: [], errors: [] };
@@ -12,11 +7,8 @@ export async function fetchFeedBatch(urls) {
         const response = await fetch(proxyUrl);
 
         const responseText = await response.text();
-        log('Response status:', response.status, 'length:', responseText.length);
 
-        // Check for size error first
         if (responseText.includes('ResponseSizeTooLarge') && urls.length > 1) {
-            log('Response too large, retrying one by one');
             let results = [];
             let errors = [];
             for (const url of urls) {
@@ -43,20 +35,16 @@ export async function fetchFeedBatch(urls) {
                     errors.push({ url: r.url, error: r.error });
                 }
             }
-            log('Batch results:', results.length, 'errors:', errors.length);
             return { results, errors };
         }
         if (data.url && data.text) {
             return { results: [{ feedUrl: data.url, text: data.text }], errors: [] };
         }
         if (data.url && data.error) {
-            log('Single URL error:', data.url, data.error);
             return { results: [], errors: [{ url: data.url, error: data.error }] };
         }
-        log('Unexpected response format:', JSON.stringify(data).substring(0, 200));
         return { results: [], errors: [] };
     } catch (e) {
-        log('Batch fetch error:', e);
         return { results: [], errors: urls.map(url => ({ url, error: e.message })) };
     }
 }

@@ -5,11 +5,6 @@ let syncInterval = null;
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 2000;
 
-const DEBUG = false;
-function log(...args) {
-    if (DEBUG) console.log('[FeedWorker]', ...args);
-}
-
 function chunkArray(arr, size) {
     const chunks = [];
     for (let i = 0; i < arr.length; i += size) {
@@ -31,7 +26,6 @@ async function scanAllFeeds() {
 
 self.onmessage = async function(e) {
     const { type, payload } = e.data;
-    log('Received message:', type);
 
     switch (type) {
         case 'init':
@@ -46,7 +40,6 @@ self.onmessage = async function(e) {
             break;
 
         case 'feeds':
-            log('Processing feeds:', payload.feeds.length);
             const feedUrls = payload.feeds.map(f => f.url);
             const batches = chunkArray(feedUrls, BATCH_SIZE);
             
@@ -54,13 +47,11 @@ self.onmessage = async function(e) {
                 const batch = batches[i];
                 const { results, errors } = await fetchFeedBatch(batch);
                 for (const result of results) {
-                    log('Sending parseFeed for:', result.feedUrl);
                     self.postMessage({ type: 'parseFeed', payload: { feedUrl: result.feedUrl, text: result.text } });
                 }
                 if (errors.length > 0) {
                     self.postMessage({ type: 'feedErrors', payload: { errors } });
                 }
-                // Small delay between batches to avoid rate limiting
                 await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
             }
             break;
