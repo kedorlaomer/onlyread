@@ -205,10 +205,6 @@ function getItemId(item) {
     return simpleHash(item.link);
 }
 
-function getItemIdFromLink(link) {
-    return simpleHash(link);
-}
-
 function markItemAsRead(item, blobStore) {
     const feeds = getFeeds(blobStore);
     for (const feed of feeds) {
@@ -283,21 +279,13 @@ let contentHtml = '';
                 titleHtml = item.title;
                 if (words.length > 0) {
                     contentHtml = words.slice(0, 100).join(' ');
-                    if (words.length > 100) {
-                        const remainingText = words.slice(100).join(' ');
-                        contentHtml += ` <a href="#" class="show-more-link" data-item-link="${item.link}" data-remaining-text="${escapeHtml(remainingText)}" title="Show more">...</a>`;
-                    }
+                    if (words.length > 100) contentHtml += '...';
                 }
             } else {
                 titleHtml = words.slice(0, 15).join(' ') + '...';
                 if (words.length > 15) {
-                    contentHtml = words.slice(15, 100).join(' ');
-                    if (words.length > 100) {
-                        const remainingText = words.slice(100).join(' ');
-                        contentHtml += ` <a href="#" class="show-more-link" data-item-link="${item.link}" data-remaining-text="${escapeHtml(remainingText)}" title="Show more">...</a>`;
-                    } else {
-                        contentHtml = '...' + contentHtml;
-                    }
+                    contentHtml = '...' + words.slice(15, 100).join(' ');
+                    if (words.length > 100) contentHtml += '...';
                 }
             }
         } else {
@@ -598,28 +586,6 @@ itemsContainer.addEventListener('click', async (e) => {
                 if (item.link === clickedItemLink) {
                     item.unread = true;
                     blobStore.markItemReadState(feed.url, clickedItemLink, false);
-                    break;
-                }
-            }
-        }
-        debouncedRenderItems();
-    }
-
-    const showMoreLink = e.target.closest('a.show-more-link');
-    if (showMoreLink) {
-        e.preventDefault();
-        const clickedItemLink = showMoreLink.getAttribute('data-item-link');
-        const itemId = getItemIdFromLink(clickedItemLink);
-        if (itemId) {
-            history.replaceState(null, '', `#${itemId}`);
-        }
-        const feeds = getFeeds(blobStore);
-        for (const feed of feeds) {
-            if (!feed.items) continue;
-            for (const item of feed.items) {
-                if (item.link === clickedItemLink) {
-                    item.unread = false;
-                    blobStore.markItemReadState(feed.url, clickedItemLink, true);
                     break;
                 }
             }
