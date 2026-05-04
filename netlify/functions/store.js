@@ -81,6 +81,8 @@ exports.handler = async (event, context) => {
                 return send(400, { error: 'Invalid JSON' });
             }
 
+            const feedUrl = event.queryStringParameters?.feedUrl;
+
             // If client provides lastSync, only proceed if server has newer data
             // Note: Action requests (markItemUnread, markAllRead, etc.) bypass this check
             // because they are targeted updates, not full data sync
@@ -133,8 +135,6 @@ exports.handler = async (event, context) => {
             if (!isActionRequest) {
                 console.log('[store] Proceeding with write');
             }
-
-            const feedUrl = event.queryStringParameters?.feedUrl;
 
             if (feedUrl && data.action) {
                 try {
