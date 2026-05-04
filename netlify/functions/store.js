@@ -82,6 +82,10 @@ exports.handler = async (event, context) => {
             }
 
             // If client provides lastSync, only proceed if server has newer data
+            // Note: Action requests (markItemUnread, markAllRead, etc.) bypass this check
+            // because they are targeted updates, not full data sync
+            const isActionRequest = !!(feedUrl && data.action);
+
             const clientLastSync = data.lastSync ? new Date(data.lastSync).getTime() : 0;
 
             let serverData = {};
@@ -99,6 +103,7 @@ exports.handler = async (event, context) => {
 
             // DEBUG logging for conflict detection
             console.log('[store] Conflict check:', {
+                isActionRequest,
                 clientLastSync,
                 serverUpdatedAt,
                 serverUpdatedAtRaw: serverData.updatedAt,
@@ -106,23 +111,28 @@ exports.handler = async (event, context) => {
                 feedsCount: serverData.feeds?.length || 0
             });
 
-            // If client has NO lastSync (null/0), it means this is a fresh session that hasn't
-            // confirmed server state yet. If server has any data, reject to force sync-from-blob first.
-            // If client's lastSync is OLDER than server, the client has stale data
-            // and should receive a 409 Conflict to trigger a sync-from-blob
-            const shouldReject = (clientLastSync === 0 && serverHasData) || 
-                (clientLastSync > 0 && serverUpdatedAt > clientLastSync);
-            
-            console.log('[store] shouldReject:', shouldReject);
-            
-            if (shouldReject) {
-                // Generate a timestamp for the 409 response so client can track server state
-                const serverTimestamp = serverData.updatedAt || new Date().toISOString();
-                console.log('[store] Returning 409 Conflict - server has newer data, returning updatedAt:', serverTimestamp);
-                return send(409, { error: 'Server has newer data', updatedAt: serverTimestamp });
+            // Skip conflict check for action requests - they are targeted updates
+            if (!isActionRequest) {
+                // If client has NO lastSync (null/0), it means this is a fresh session that hasn't
+                // confirmed server state yet. If server has any data, reject to force sync-from-blob first.
+                // If client's lastSync is OLDER than server, the client has stale data
+                // and should receive a 409 Conflict to trigger a sync-from-blob
+                const shouldReject = (clientLastSync === 0 && serverHasData) || 
+                    (clientLastSync > 0 && serverUpdatedAt > clientLastSync);
+                
+                console.log('[store] shouldReject:', shouldReject);
+                
+                if (shouldReject) {
+                    // Generate a timestamp for the 409 response so client can track server state
+                    const serverTimestamp = serverData.updatedAt || new Date().toISOString();
+                    console.log('[store] Returning 409 Conflict - server has newer data, returning updatedAt:', serverTimestamp);
+                    return send(409, { error: 'Server has newer data', updatedAt: serverTimestamp });
+                }
             }
             
-            console.log('[store] Proceeding with write');
+            if (!isActionRequest) {
+                console.log('[store] Proceeding with write');
+            }
 
             const feedUrl = event.queryStringParameters?.feedUrl;
 
