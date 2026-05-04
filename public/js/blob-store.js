@@ -125,6 +125,7 @@ export function createBlobStore() {
     let blobAvailable = false;
     const pendingCallbacks = [];
     let syncTimeout = null;
+    let lastSyncFromBlob = 0;
     const SYNC_DEBOUNCE_MS = 500;
 
     function ensureReady() {
@@ -177,6 +178,7 @@ export function createBlobStore() {
 
                     case 'syncFromBlob':
                         (async () => {
+                            lastSyncFromBlob = Date.now();
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
                                 memoryCache[storageKey] = value;
@@ -225,6 +227,10 @@ export function createBlobStore() {
             
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
+                // Skip sync if we just downloaded from blob (prevents overwriting remote changes)
+                if (Date.now() - lastSyncFromBlob < 1000) {
+                    return;
+                }
                 const keysToSync = Object.keys(memoryCache)
                     .filter(k => k.startsWith(`blob_${currentUserId}_`))
                     .map(k => k.replace(`blob_${currentUserId}_`, ''));
