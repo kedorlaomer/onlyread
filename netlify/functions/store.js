@@ -46,11 +46,11 @@ exports.handler = async (event, context) => {
                         data = { _raw: raw };
                     }
                 }
-                
-                // Handle pagination
+
+                // Handle pagination for feeds
                 const offset = parseInt(event.queryStringParameters?.offset) || 0;
                 const limit = parseInt(event.queryStringParameters?.limit) || 50;
-                
+
                 if (data.feeds && Array.isArray(data.feeds)) {
                     const total = data.feeds.length;
                     const paginatedFeeds = data.feeds.slice(offset, offset + limit);
@@ -59,14 +59,15 @@ exports.handler = async (event, context) => {
                         total,
                         offset,
                         limit,
-                        hasMore: offset + limit < total
+                        hasMore: offset + limit < total,
+                        updatedAt: data.updatedAt || null
                     });
                 }
-                
-                return send(200, data);
+
+                return send(200, { ...data, updatedAt: data.updatedAt || null });
             } catch (e) {
                 if (e.message.includes('not exist') || e.message.includes('404')) {
-                    return send(200, { feeds: [], total: 0, offset: 0, limit: 50, hasMore: false });
+                    return send(200, { feeds: [], total: 0, offset: 0, limit: 50, hasMore: false, updatedAt: null });
                 }
                 return send(500, { error: e.message });
             }
@@ -79,6 +80,47 @@ exports.handler = async (event, context) => {
             } catch (e) {
                 return send(400, { error: 'Invalid JSON' });
             }
+
+            // If client provides lastSync, only proceed if server has newer data
+            const clientLastSync = data.lastSync ? new Date(data.lastSync).getTime() : 0;
+
+            let serverData = {};
+            try {
+                const raw = await store.get(userId);
+                if (raw) {
+                    serverData = JSON.parse(raw);
+                }
+            } catch (e) {
+                // No existing data - safe to proceed
+            }
+
+            const serverUpdatedAt = serverData.updatedAt ? new Date(serverData.updatedAt).getTime() : 0;
+            const serverHasData = serverData.feeds && serverData.feeds.length > 0;
+
+            // DEBUG logging for conflict detection
+            console.log('[store] Conflict check:', {
+                clientLastSync,
+                serverUpdatedAt,
+                serverUpdatedAtRaw: serverData.updatedAt,
+                serverHasData,
+                feedsCount: serverData.feeds?.length || 0
+            });
+
+            // If client has NO lastSync (null/0), it means this is a fresh session that hasn't
+            // confirmed server state yet. If server has any data, reject to force sync-from-blob first.
+            // If client's lastSync is OLDER than server, the client has stale data
+            // and should receive a 409 Conflict to trigger a sync-from-blob
+            const shouldReject = (clientLastSync === 0 && serverHasData) || 
+                (clientLastSync > 0 && serverUpdatedAt > clientLastSync);
+            
+            console.log('[store] shouldReject:', shouldReject);
+            
+            if (shouldReject) {
+                console.log('[store] Returning 409 Conflict - server has newer data');
+                return send(409, { error: 'Server has newer data', updatedAt: serverData.updatedAt });
+            }
+            
+            console.log('[store] Proceeding with write');
 
             const feedUrl = event.queryStringParameters?.feedUrl;
 
@@ -100,29 +142,31 @@ exports.handler = async (event, context) => {
                         return send(404, { error: 'Feed not found' });
                     }
 
-                    if (data.action === 'markAllRead') {
-                        if (existingFeeds[feedIndex].items) {
-                            for (const item of existingFeeds[feedIndex].items) {
-                                item.unread = false;
-                            }
-                        }
-                        await store.setJSON(userId, { feeds: existingFeeds });
-                        return send(200, { success: true });
-                    }
+if (data.action === 'markAllRead') {
+                         if (existingFeeds[feedIndex].items) {
+                             for (const item of existingFeeds[feedIndex].items) {
+                                 item.unread = false;
+                             }
+                         }
+                         const updatedAt = new Date().toISOString();
+                         await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                         return send(200, { success: true, updatedAt });
+                     }
 
-                    if (data.action === 'markItemRead' || data.action === 'markItemUnread') {
-                        const isRead = data.action === 'markItemRead';
-                        if (existingFeeds[feedIndex].items && data.itemLink) {
-                            for (const item of existingFeeds[feedIndex].items) {
-                                if (item.link === data.itemLink) {
-                                    item.unread = !isRead;
-                                    break;
-                                }
-                            }
-                        }
-                        await store.setJSON(userId, { feeds: existingFeeds });
-                        return send(200, { success: true });
-                    }
+                     if (data.action === 'markItemRead' || data.action === 'markItemUnread') {
+                         const isRead = data.action === 'markItemRead';
+                         if (existingFeeds[feedIndex].items && data.itemLink) {
+                             for (const item of existingFeeds[feedIndex].items) {
+                                 if (item.link === data.itemLink) {
+                                     item.unread = !isRead;
+                                     break;
+                                 }
+                             }
+                         }
+                         const updatedAt = new Date().toISOString();
+                         await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                         return send(200, { success: true, updatedAt });
+                     }
 
                     return send(400, { error: 'Unknown action' });
                 } catch (e) {
@@ -188,9 +232,10 @@ exports.handler = async (event, context) => {
                     }
                 }
                 
-                // Save merged feeds
-                await store.setJSON(userId, { feeds: existingFeeds });
-                return send(200, { success: true, feedCount: existingFeeds.length });
+// Save merged feeds with timestamp
+                 const updatedAt = new Date().toISOString();
+                 await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                 return send(200, { success: true, feedCount: existingFeeds.length, updatedAt });
             } catch (e) {
                 return send(500, { error: e.message });
             }

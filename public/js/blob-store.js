@@ -126,6 +126,7 @@ export function createBlobStore() {
     const pendingCallbacks = [];
     let syncTimeout = null;
     const SYNC_DEBOUNCE_MS = 500;
+    let lastSync = null;
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -166,7 +167,7 @@ export function createBlobStore() {
             worker = new Worker('js/blob-worker.js', { type: 'module' });
 
             worker.onmessage = (e) => {
-                const { type, data } = e.data;
+                const { type, data, payload } = e.data;
 
                 switch (type) {
                     case 'ready':
@@ -177,10 +178,17 @@ export function createBlobStore() {
 
                     case 'syncFromBlob':
                         (async () => {
+                            console.log('[blob-store] syncFromBlob received:', { dataKeys: Object.keys(data), updatedAt: data.updatedAt });
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
                                 memoryCache[storageKey] = value;
                                 await dbSet(storageKey, value);
+                            }
+                            if (data.updatedAt) {
+                                lastSync = data.updatedAt;
+                                console.log('[blob-store] Updated lastSync to:', lastSync);
+                            } else {
+                                console.log('[blob-store] No updatedAt in syncFromBlob response');
                             }
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                         })();
@@ -188,6 +196,7 @@ export function createBlobStore() {
 
                     case 'requestData':
                         (async () => {
+                            console.log('[blob-store] requestData - sending lastSync:', lastSync);
                             const allData = {};
                             for (const key of Object.keys(memoryCache)) {
                                 if (key.startsWith(`blob_${userId}_`)) {
@@ -195,11 +204,17 @@ export function createBlobStore() {
                                     allData[shortKey] = memoryCache[key];
                                 }
                             }
-                            worker.postMessage({ type: 'sync', payload: { data: allData } });
+                            worker.postMessage({ type: 'sync', payload: { data: allData, lastSync } });
                         })();
                         break;
 
-                    case 'synced':
+                    case 'conflict':
+                        console.log('[blob-store] Received conflict from worker:', payload);
+                        if (payload?.updatedAt) {
+                            lastSync = null;
+                            console.log('[blob-store] Cleared lastSync due to conflict, triggering syncFromBlob');
+                            worker.postMessage({ type: 'syncFromBlob' });
+                        }
                         break;
                 }
             };
@@ -222,20 +237,20 @@ export function createBlobStore() {
             if (!currentUserId) throw new Error('Store not initialized');
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
-            
+
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
                 const keysToSync = Object.keys(memoryCache)
                     .filter(k => k.startsWith(`blob_${currentUserId}_`))
                     .map(k => k.replace(`blob_${currentUserId}_`, ''));
-                
+
                 const dataToSync = {};
                 for (const k of keysToSync) {
                     dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
                 }
-                
+
                 if (worker) {
-                    worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
+                    worker.postMessage({ type: 'sync', payload: { data: dataToSync, lastSync } });
                 }
             }, SYNC_DEBOUNCE_MS);
         },
@@ -258,13 +273,13 @@ export function createBlobStore() {
             const keysToSync = Object.keys(memoryCache)
                 .filter(k => k.startsWith(`blob_${currentUserId}_`))
                 .map(k => k.replace(`blob_${currentUserId}_`, ''));
-            
+
             const dataToSync = {};
             for (const k of keysToSync) {
                 dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
             }
-            
-            worker.postMessage({ type: 'sync', payload: { data: dataToSync } });
+
+            worker.postMessage({ type: 'sync', payload: { data: dataToSync, lastSync } });
         },
 
         destroy() {
