@@ -116,8 +116,10 @@ exports.handler = async (event, context) => {
             console.log('[store] shouldReject:', shouldReject);
             
             if (shouldReject) {
-                console.log('[store] Returning 409 Conflict - server has newer data');
-                return send(409, { error: 'Server has newer data', updatedAt: serverData.updatedAt });
+                // Generate a timestamp for the 409 response so client can track server state
+                const serverTimestamp = serverData.updatedAt || new Date().toISOString();
+                console.log('[store] Returning 409 Conflict - server has newer data, returning updatedAt:', serverTimestamp);
+                return send(409, { error: 'Server has newer data', updatedAt: serverTimestamp });
             }
             
             console.log('[store] Proceeding with write');
@@ -233,7 +235,7 @@ if (data.action === 'markAllRead') {
                 }
                 
 // Save merged feeds with timestamp
-                 const updatedAt = new Date().toISOString();
+                 const updatedAt = serverData.updatedAt || new Date().toISOString();
                  await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
                  return send(200, { success: true, feedCount: existingFeeds.length, updatedAt });
             } catch (e) {

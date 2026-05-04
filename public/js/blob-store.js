@@ -127,6 +127,7 @@ export function createBlobStore() {
     let syncTimeout = null;
     const SYNC_DEBOUNCE_MS = 500;
     let lastSync = null;
+    let initialSyncComplete = false;
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -188,15 +189,24 @@ export function createBlobStore() {
                                 lastSync = data.updatedAt;
                                 console.log('[blob-store] Updated lastSync to:', lastSync);
                             } else {
-                                console.log('[blob-store] No updatedAt in syncFromBlob response');
+                                // Server has no updatedAt - set lastSync to now so we can proceed
+                                lastSync = new Date().toISOString();
+                                console.log('[blob-store] No updatedAt in syncFromBlob response, set lastSync to now:', lastSync);
                             }
+                            initialSyncComplete = true;
+                            console.log('[blob-store] Initial sync complete');
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                         })();
                         break;
 
                     case 'requestData':
                         (async () => {
-                            console.log('[blob-store] requestData - sending lastSync:', lastSync);
+                            console.log('[blob-store] requestData - sending lastSync:', lastSync, 'initialSyncComplete:', initialSyncComplete);
+                            // Don't respond to requestData until initial sync is complete
+                            if (!initialSyncComplete) {
+                                console.log('[blob-store] Ignoring requestData - initial sync not complete');
+                                return;
+                            }
                             const allData = {};
                             for (const key of Object.keys(memoryCache)) {
                                 if (key.startsWith(`blob_${userId}_`)) {
@@ -210,11 +220,10 @@ export function createBlobStore() {
 
                     case 'conflict':
                         console.log('[blob-store] Received conflict from worker:', payload);
-                        if (payload?.updatedAt) {
-                            lastSync = null;
-                            console.log('[blob-store] Cleared lastSync due to conflict, triggering syncFromBlob');
-                            worker.postMessage({ type: 'syncFromBlob' });
-                        }
+                        // Always sync from blob on conflict, regardless of updatedAt
+                        lastSync = null;
+                        console.log('[blob-store] Cleared lastSync due to conflict, triggering syncFromBlob');
+                        worker.postMessage({ type: 'syncFromBlob' });
                         break;
                 }
             };
@@ -237,6 +246,12 @@ export function createBlobStore() {
             if (!currentUserId) throw new Error('Store not initialized');
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
+
+            // Don't sync until initial sync from blob is complete
+            if (!initialSyncComplete) {
+                console.log('[blob-store] set() called but initialSyncComplete is false, skipping sync');
+                return;
+            }
 
             if (syncTimeout) clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => {
