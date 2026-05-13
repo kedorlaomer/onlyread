@@ -65,6 +65,38 @@ async function syncFromBlob() {
 
 const BATCH_SIZE_BYTES = 1024 * 1024;
 
+// Sends a batch of feeds, retrying once on 409 with the server's updatedAt.
+// Returns true on success, false if conflict could not be resolved (caller must abort).
+async function sendBatch(feeds) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await fetch(`/.netlify/functions/store/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feeds, lastSync })
+        });
+
+        console.log('[blob-worker] Batch response:', response.status, `(attempt ${attempt + 1})`);
+
+        if (response.status === 409) {
+            const conflictData = await response.json();
+            console.log('[blob-worker] 409 received:', conflictData);
+            if (attempt === 0) {
+                // Update lastSync to server's value and retry once — the 409 is likely
+                // from a concurrent mark action, not a genuine data conflict.
+                lastSync = conflictData.updatedAt;
+                continue;
+            }
+            // Second 409: genuine conflict from another source; escalate.
+            self.postMessage({ type: 'conflict', payload: { updatedAt: conflictData.updatedAt } });
+            return false;
+        }
+
+        const result = await response.json();
+        if (result.updatedAt) lastSync = result.updatedAt;
+        return true;
+    }
+}
+
 async function syncToBlob(data) {
     if (!userId || !blobAvailable) return;
 
@@ -84,23 +116,7 @@ async function syncToBlob(data) {
 
                 if (currentBatchSize + feedSize > BATCH_SIZE_BYTES && currentBatch.length > 0) {
                     console.log('[blob-worker] Sending batch to server, size:', currentBatch.length);
-                    const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ feeds: currentBatch, lastSync })
-                    });
-
-                    console.log('[blob-worker] Server response:', response.status);
-                    if (response.status === 409) {
-                        const conflictData = await response.json();
-                        console.log('[blob-worker] 409 Conflict received:', conflictData);
-                        self.postMessage({ type: 'conflict', payload: { updatedAt: conflictData.updatedAt } });
-                        return;
-                    }
-
-                    const batchResult = await response.json();
-                    if (batchResult.updatedAt) lastSync = batchResult.updatedAt;
-
+                    if (!await sendBatch(currentBatch)) return;
                     currentBatch = [];
                     currentBatchSize = 0;
                 }
@@ -111,22 +127,7 @@ async function syncToBlob(data) {
 
             if (currentBatch.length > 0) {
                 console.log('[blob-worker] Sending final batch to server, size:', currentBatch.length);
-                const response = await fetch(`/.netlify/functions/store/${userId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ feeds: currentBatch, lastSync })
-                });
-
-                console.log('[blob-worker] Final batch response:', response.status);
-                if (response.status === 409) {
-                    const conflictData = await response.json();
-                    console.log('[blob-worker] 409 Conflict on final batch:', conflictData);
-                    self.postMessage({ type: 'conflict', payload: { updatedAt: conflictData.updatedAt } });
-                    return;
-                }
-
-                const finalResult = await response.json();
-                if (finalResult.updatedAt) lastSync = finalResult.updatedAt;
+                if (!await sendBatch(currentBatch)) return;
             }
         } else {
             await fetch(`/.netlify/functions/store/${userId}`, {
