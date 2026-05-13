@@ -121,9 +121,10 @@
         }
         .sync-status {
             position: fixed;
-            bottom: 1rem;
+            bottom: max(1rem, env(safe-area-inset-bottom));
             left: 50%;
             transform: translateX(-50%);
+            max-width: calc(100vw - 2rem);
             font-size: 0.8em;
             color: #555;
             background: #f0f0f0;
@@ -131,6 +132,8 @@
             border-radius: 4px;
             padding: 0.35rem 0.75rem;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             opacity: 1;
             transition: opacity 0.5s;
         }
