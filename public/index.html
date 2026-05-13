@@ -120,13 +120,22 @@
             display: block;
         }
         .sync-status {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
             font-size: 0.8em;
-            color: #999;
-            text-align: center;
-            min-height: 1.2em;
-            margin-bottom: 1rem;
+            color: #555;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0.35rem 0.75rem;
+            white-space: nowrap;
             opacity: 1;
             transition: opacity 0.5s;
+        }
+        .sync-status:empty {
+            display: none;
         }
         .sync-status.fade {
             opacity: 0;
@@ -148,7 +157,6 @@
                 <span id="nav-manage" class="nav-link">Manage</span>
                 <span id="nav-logout" class="nav-link">Logout</span>
             </div>
-            <div id="sync-status" class="sync-status"></div>
             
             <div id="page-read" class="page hidden">
                 <div style="margin-bottom: 1rem;">
@@ -191,6 +199,7 @@
         </div>
     </div>
 
+    <div id="sync-status" class="sync-status"></div>
     <script type="module" src="js/auth.js"></script>
 </body>
 </html>
