@@ -129,6 +129,50 @@ export function createBlobStore() {
     let lastSync = null;
     let initialSyncComplete = false;
     let resolvingConflict = false;
+    let serverKnownItems = new Map(); // feedUrl -> Set<guid||link> confirmed on server
+    let pendingUploadItems = null;    // Map<feedUrl, Set<id>> for items currently being uploaded
+
+    // Returns { feeds, uploading } with only items the server doesn't have yet,
+    // or null if there is nothing new to upload.
+    function buildSyncPayload() {
+        const feeds = memoryCache[getStorageKey(currentUserId, 'feeds')];
+        if (!feeds || !Array.isArray(feeds)) return null;
+
+        const filteredFeeds = [];
+        const uploading = new Map();
+
+        for (const feed of feeds) {
+            if (!feed.url) continue;
+            const knownIds = serverKnownItems.get(feed.url);
+            const allItems = feed.items || [];
+
+            if (!knownIds) {
+                // Feed not yet on server — upload everything
+                filteredFeeds.push(feed);
+                uploading.set(feed.url, new Set(allItems.map(i => i.guid || i.link).filter(Boolean)));
+            } else {
+                const newItems = allItems.filter(item => {
+                    const id = item.guid || item.link;
+                    return id && !knownIds.has(id);
+                });
+                if (newItems.length > 0) {
+                    filteredFeeds.push({ ...feed, items: newItems });
+                    uploading.set(feed.url, new Set(newItems.map(i => i.guid || i.link).filter(Boolean)));
+                }
+            }
+        }
+
+        if (filteredFeeds.length === 0) return null;
+        return { feeds: filteredFeeds, uploading };
+    }
+
+    function sendSync() {
+        if (!worker || !initialSyncComplete || resolvingConflict) return;
+        const result = buildSyncPayload();
+        if (!result) return;
+        pendingUploadItems = result.uploading;
+        worker.postMessage({ type: 'sync', payload: { data: { feeds: result.feeds }, lastSync } });
+    }
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -182,6 +226,18 @@ export function createBlobStore() {
                         (async () => {
                             resolvingConflict = false;
                             console.log('[blob-store] syncFromBlob received:', { dataKeys: Object.keys(data), updatedAt: data.updatedAt });
+                            if (data.feeds && Array.isArray(data.feeds)) {
+                                serverKnownItems = new Map();
+                                for (const feed of data.feeds) {
+                                    if (!feed.url) continue;
+                                    const ids = new Set();
+                                    for (const item of (feed.items || [])) {
+                                        const id = item.guid || item.link;
+                                        if (id) ids.add(id);
+                                    }
+                                    serverKnownItems.set(feed.url, ids);
+                                }
+                            }
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
                                 memoryCache[storageKey] = value;
@@ -203,22 +259,8 @@ export function createBlobStore() {
                         break;
 
                     case 'requestData':
-                        (async () => {
-                            console.log('[blob-store] requestData - sending lastSync:', lastSync, 'initialSyncComplete:', initialSyncComplete);
-                            // Don't respond to requestData until initial sync is complete
-                            if (!initialSyncComplete) {
-                                console.log('[blob-store] Ignoring requestData - initial sync not complete');
-                                return;
-                            }
-                            const allData = {};
-                            for (const key of Object.keys(memoryCache)) {
-                                if (key.startsWith(`blob_${userId}_`)) {
-                                    const shortKey = key.replace(`blob_${userId}_`, '');
-                                    allData[shortKey] = memoryCache[key];
-                                }
-                            }
-                            worker.postMessage({ type: 'sync', payload: { data: allData, lastSync } });
-                        })();
+                        if (!initialSyncComplete) break;
+                        sendSync();
                         break;
 
                     case 'conflict':
@@ -234,6 +276,17 @@ export function createBlobStore() {
                         if (e.data.updatedAt) {
                             lastSync = e.data.updatedAt;
                             console.log('[blob-store] Updated lastSync after sync:', lastSync);
+                        }
+                        if (pendingUploadItems) {
+                            for (const [feedUrl, ids] of pendingUploadItems) {
+                                const existing = serverKnownItems.get(feedUrl);
+                                if (existing) {
+                                    for (const id of ids) existing.add(id);
+                                } else {
+                                    serverKnownItems.set(feedUrl, new Set(ids));
+                                }
+                            }
+                            pendingUploadItems = null;
                         }
                         window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: { phase: 'synced' } }));
                         break;
@@ -270,27 +323,10 @@ export function createBlobStore() {
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
 
-            // Don't sync until initial sync from blob is complete, or while resolving a conflict
-            if (!initialSyncComplete || resolvingConflict) {
-                console.log('[blob-store] set() called but sync blocked (initialSyncComplete:', initialSyncComplete, 'resolvingConflict:', resolvingConflict, ')');
-                return;
-            }
+            if (!initialSyncComplete || resolvingConflict) return;
 
             if (syncTimeout) clearTimeout(syncTimeout);
-            syncTimeout = setTimeout(() => {
-                const keysToSync = Object.keys(memoryCache)
-                    .filter(k => k.startsWith(`blob_${currentUserId}_`))
-                    .map(k => k.replace(`blob_${currentUserId}_`, ''));
-
-                const dataToSync = {};
-                for (const k of keysToSync) {
-                    dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
-                }
-
-                if (worker) {
-                    worker.postMessage({ type: 'sync', payload: { data: dataToSync, lastSync } });
-                }
-            }, SYNC_DEBOUNCE_MS);
+            syncTimeout = setTimeout(sendSync, SYNC_DEBOUNCE_MS);
         },
 
         getAll() {
@@ -307,17 +343,7 @@ export function createBlobStore() {
         },
 
         syncNow() {
-            if (!currentUserId || !worker) return;
-            const keysToSync = Object.keys(memoryCache)
-                .filter(k => k.startsWith(`blob_${currentUserId}_`))
-                .map(k => k.replace(`blob_${currentUserId}_`, ''));
-
-            const dataToSync = {};
-            for (const k of keysToSync) {
-                dataToSync[k] = memoryCache[getStorageKey(currentUserId, k)];
-            }
-
-            worker.postMessage({ type: 'sync', payload: { data: dataToSync, lastSync } });
+            sendSync();
         },
 
         destroy() {
