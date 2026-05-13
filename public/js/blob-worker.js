@@ -191,11 +191,15 @@ self.onmessage = async function(e) {
                 return;
             }
             try {
-                await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'markAllRead' })
                 });
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.updatedAt) lastSync = result.updatedAt;
+                }
             } catch (e) {
             }
             break;
@@ -205,11 +209,15 @@ self.onmessage = async function(e) {
             if (!userId || !blobAvailable) return;
             try {
                 const isRead = type === 'markItemRead';
-                await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: isRead ? 'markItemRead' : 'markItemUnread', itemLink: payload.itemLink })
                 });
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.updatedAt) lastSync = result.updatedAt;
+                }
             } catch (e) {
             }
             break;
