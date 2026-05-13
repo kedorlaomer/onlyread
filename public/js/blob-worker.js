@@ -16,40 +16,50 @@ async function checkBlobAvailability() {
 async function syncFromBlob() {
     if (!userId || !blobAvailable) return;
 
-    try {
-        let allFeeds = [];
-        let offset = 0;
-        const limit = 50;
-        let hasMore = true;
-        let serverUpdatedAt = null;
+    const MAX_RETRIES = 3;
+    const limit = 50;
 
-        while (hasMore) {
-            console.log('[blob-worker] Fetching from blob offset:', offset);
-            const response = await fetch(`/.netlify/functions/store/${userId}?offset=${offset}&limit=${limit}`);
-            if (response.status === 404) { console.log('[blob-worker] No data found (404)'); return; }
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            let allFeeds = [];
+            let offset = 0;
+            let hasMore = true;
+            let serverUpdatedAt = null;
 
-            const data = await response.json();
-            serverUpdatedAt = data.updatedAt || null;
-            console.log('[blob-worker] Received response, hasMore:', data.hasMore, 'updatedAt:', serverUpdatedAt);
+            while (hasMore) {
+                console.log('[blob-worker] Fetching from blob offset:', offset);
+                const response = await fetch(`/.netlify/functions/store/${userId}?offset=${offset}&limit=${limit}`);
+                if (response.status === 404) { console.log('[blob-worker] No data found (404)'); return; }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-            if (data.feeds && Array.isArray(data.feeds)) {
-                allFeeds = allFeeds.concat(data.feeds);
-                hasMore = data.hasMore;
-                offset += limit;
+                const data = await response.json();
+                serverUpdatedAt = data.updatedAt || null;
+                console.log('[blob-worker] Received response, hasMore:', data.hasMore, 'updatedAt:', serverUpdatedAt);
+
+                if (data.feeds && Array.isArray(data.feeds)) {
+                    allFeeds = allFeeds.concat(data.feeds);
+                    hasMore = data.hasMore;
+                    offset += limit;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            console.log('[blob-worker] syncFromBlob complete, feeds:', allFeeds.length, 'updatedAt:', serverUpdatedAt);
+            if (allFeeds.length > 0) {
+                self.postMessage({ type: 'syncFromBlob', data: { feeds: allFeeds, updatedAt: serverUpdatedAt } });
+            } else if (serverUpdatedAt) {
+                self.postMessage({ type: 'syncFromBlob', data: { feeds: [], updatedAt: serverUpdatedAt } });
+            }
+            return;
+        } catch (e) {
+            console.log(`[blob-worker] syncFromBlob error (attempt ${attempt}/${MAX_RETRIES}):`, e);
+            if (attempt < MAX_RETRIES) {
+                await new Promise(r => setTimeout(r, 1000 * attempt));
             } else {
-                hasMore = false;
+                self.postMessage({ type: 'syncFromBlobError', payload: { error: e.message } });
             }
         }
-
-        console.log('[blob-worker] syncFromBlob complete, feeds:', allFeeds.length, 'updatedAt:', serverUpdatedAt);
-        if (allFeeds.length > 0) {
-            self.postMessage({ type: 'syncFromBlob', data: { feeds: allFeeds, updatedAt: serverUpdatedAt } });
-        } else if (serverUpdatedAt) {
-            self.postMessage({ type: 'syncFromBlob', data: { feeds: [], updatedAt: serverUpdatedAt } });
-        }
-    } catch (e) {
-        console.log('[blob-worker] syncFromBlob error:', e);
     }
 }
 

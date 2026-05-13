@@ -47,19 +47,28 @@ exports.handler = async (event, context) => {
                     }
                 }
 
-                // Handle pagination for feeds
+                // Handle pagination for feeds — paginate by byte size to stay under the
+                // 6 MB Lambda response limit, regardless of the client's requested limit.
                 const offset = parseInt(event.queryStringParameters?.offset) || 0;
-                const limit = parseInt(event.queryStringParameters?.limit) || 50;
+                const MAX_PAGE_BYTES = 4 * 1024 * 1024; // 4 MB, safely under 6 MB limit
 
                 if (data.feeds && Array.isArray(data.feeds)) {
                     const total = data.feeds.length;
-                    const paginatedFeeds = data.feeds.slice(offset, offset + limit);
+                    const paginatedFeeds = [];
+                    let pageBytes = 0;
+
+                    for (let i = offset; i < data.feeds.length; i++) {
+                        const feedJson = JSON.stringify(data.feeds[i]);
+                        if (pageBytes + feedJson.length > MAX_PAGE_BYTES && paginatedFeeds.length > 0) break;
+                        paginatedFeeds.push(data.feeds[i]);
+                        pageBytes += feedJson.length;
+                    }
+
                     return send(200, {
                         feeds: paginatedFeeds,
                         total,
                         offset,
-                        limit,
-                        hasMore: offset + limit < total,
+                        hasMore: offset + paginatedFeeds.length < total,
                         updatedAt: data.updatedAt || null
                     });
                 }
@@ -245,7 +254,7 @@ if (data.action === 'markAllRead') {
                 }
                 
 // Save merged feeds with timestamp
-                 const updatedAt = serverData.updatedAt || new Date().toISOString();
+                 const updatedAt = new Date().toISOString();
                  await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
                  return send(200, { success: true, feedCount: existingFeeds.length, updatedAt });
             } catch (e) {

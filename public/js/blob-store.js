@@ -225,6 +225,13 @@ export function createBlobStore() {
                         console.log('[blob-store] Cleared lastSync due to conflict, triggering syncFromBlob');
                         worker.postMessage({ type: 'syncFromBlob' });
                         break;
+
+                    case 'syncFromBlobError':
+                        console.log('[blob-store] syncFromBlob failed:', payload?.error, '— retrying in 30s');
+                        setTimeout(() => {
+                            if (worker) worker.postMessage({ type: 'syncFromBlob' });
+                        }, 30000);
+                        break;
                 }
             };
 
