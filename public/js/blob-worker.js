@@ -40,6 +40,7 @@ async function syncFromBlob() {
                     allFeeds = allFeeds.concat(data.feeds);
                     hasMore = data.hasMore;
                     offset += limit;
+                    self.postMessage({ type: 'syncProgress', payload: { phase: 'downloading', current: allFeeds.length, total: data.total ?? null } });
                 } else {
                     hasMore = false;
                 }
@@ -110,6 +111,9 @@ async function syncToBlob(data) {
         if (key === 'feeds' && Array.isArray(value)) {
             let currentBatch = [];
             let currentBatchSize = 0;
+            const totalFeeds = value.length;
+            let feedsSent = 0;
+            self.postMessage({ type: 'syncProgress', payload: { phase: 'uploading', current: 0, total: totalFeeds } });
 
             for (const feed of value) {
                 const feedSize = JSON.stringify(feed).length;
@@ -117,6 +121,8 @@ async function syncToBlob(data) {
                 if (currentBatchSize + feedSize > BATCH_SIZE_BYTES && currentBatch.length > 0) {
                     console.log('[blob-worker] Sending batch to server, size:', currentBatch.length);
                     if (!await sendBatch(currentBatch)) return;
+                    feedsSent += currentBatch.length;
+                    self.postMessage({ type: 'syncProgress', payload: { phase: 'uploading', current: feedsSent, total: totalFeeds } });
                     currentBatch = [];
                     currentBatchSize = 0;
                 }
@@ -128,6 +134,8 @@ async function syncToBlob(data) {
             if (currentBatch.length > 0) {
                 console.log('[blob-worker] Sending final batch to server, size:', currentBatch.length);
                 if (!await sendBatch(currentBatch)) return;
+                feedsSent += currentBatch.length;
+                self.postMessage({ type: 'syncProgress', payload: { phase: 'uploading', current: feedsSent, total: totalFeeds } });
             }
         } else {
             await fetch(`/.netlify/functions/store/${userId}`, {

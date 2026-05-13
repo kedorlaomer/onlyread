@@ -600,3 +600,24 @@ window.addEventListener('onlyread:dataUpdated', () => {
     debouncedRenderItems();
     renderFeeds();
 });
+
+const syncStatus = document.getElementById('sync-status');
+let syncStatusTimer = null;
+
+window.addEventListener('onlyread:syncStatus', (e) => {
+    const { phase, current, total } = e.detail;
+    if (syncStatusTimer) { clearTimeout(syncStatusTimer); syncStatusTimer = null; }
+    syncStatus.classList.remove('fade');
+
+    if (phase === 'downloading') {
+        syncStatus.textContent = total != null ? `Downloading feeds (${current}/${total})` : 'Downloading feeds...';
+    } else if (phase === 'uploading') {
+        syncStatus.textContent = `Uploading feeds (${current}/${total})`;
+    } else if (phase === 'synced') {
+        syncStatus.textContent = 'Synced';
+        syncStatusTimer = setTimeout(() => {
+            syncStatus.classList.add('fade');
+            syncStatusTimer = setTimeout(() => { syncStatus.textContent = ''; }, 500);
+        }, 2000);
+    }
+});

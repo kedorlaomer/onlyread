@@ -198,6 +198,7 @@ export function createBlobStore() {
                             initialSyncComplete = true;
                             console.log('[blob-store] Initial sync complete');
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
+                            window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: { phase: 'synced' } }));
                         })();
                         break;
 
@@ -234,6 +235,11 @@ export function createBlobStore() {
                             lastSync = e.data.updatedAt;
                             console.log('[blob-store] Updated lastSync after sync:', lastSync);
                         }
+                        window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: { phase: 'synced' } }));
+                        break;
+
+                    case 'syncProgress':
+                        window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: payload }));
                         break;
 
                     case 'syncFromBlobError':
