@@ -255,6 +255,7 @@ export function createBlobStore() {
                             console.log('[blob-store] Initial sync complete');
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                             window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: { phase: 'synced' } }));
+                            sendSync();
                         })();
                         break;
 
@@ -343,7 +344,8 @@ export function createBlobStore() {
         },
 
         syncNow() {
-            sendSync();
+            if (!worker) return;
+            worker.postMessage({ type: 'syncFromBlob' });
         },
 
         destroy() {
