@@ -229,6 +229,13 @@ export function createBlobStore() {
                         worker.postMessage({ type: 'syncFromBlob' });
                         break;
 
+                    case 'synced':
+                        if (e.data.updatedAt) {
+                            lastSync = e.data.updatedAt;
+                            console.log('[blob-store] Updated lastSync after sync:', lastSync);
+                        }
+                        break;
+
                     case 'syncFromBlobError':
                         console.log('[blob-store] syncFromBlob failed:', payload?.error, '— retrying in 30s');
                         setTimeout(() => {

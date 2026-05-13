@@ -138,7 +138,7 @@ async function syncToBlob(data) {
     }
 
     console.log('[blob-worker] syncToBlob complete');
-    self.postMessage({ type: 'synced' });
+    self.postMessage({ type: 'synced', updatedAt: lastSync });
 }
 
 function startSync() {
