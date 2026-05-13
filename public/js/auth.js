@@ -246,10 +246,6 @@ function renderItems() {
         return dateB - dateA;
     });
     
-    if (hideRead) {
-        allItems = allItems.filter(item => item.unread !== false);
-    }
-    
     if (filteredFeedTitle) {
         allItems = allItems.filter(item => item.feedTitle === filteredFeedTitle);
     }
@@ -266,6 +262,9 @@ function renderItems() {
     }
     
     itemsContainer.innerHTML = '<div class="item-list">' + allItems.map(item => {
+        if (hideRead && item.unread === false) {
+            return `<span id="${getItemId(item)}"></span>`;
+        }
         const feedTitle = item.feedTitle;
         const dateStr = formatDate(item.pubDate);
         let titleHtml = '';
