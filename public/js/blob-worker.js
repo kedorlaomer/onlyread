@@ -98,6 +98,9 @@ async function syncToBlob(data) {
                         return;
                     }
 
+                    const batchResult = await response.json();
+                    if (batchResult.updatedAt) lastSync = batchResult.updatedAt;
+
                     currentBatch = [];
                     currentBatchSize = 0;
                 }
@@ -121,6 +124,9 @@ async function syncToBlob(data) {
                     self.postMessage({ type: 'conflict', payload: { updatedAt: conflictData.updatedAt } });
                     return;
                 }
+
+                const finalResult = await response.json();
+                if (finalResult.updatedAt) lastSync = finalResult.updatedAt;
             }
         } else {
             await fetch(`/.netlify/functions/store/${userId}`, {
