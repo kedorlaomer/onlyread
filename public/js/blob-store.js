@@ -128,6 +128,7 @@ export function createBlobStore() {
     const SYNC_DEBOUNCE_MS = 500;
     let lastSync = null;
     let initialSyncComplete = false;
+    let resolvingConflict = false;
 
     function ensureReady() {
         return new Promise((resolve) => {
@@ -179,6 +180,7 @@ export function createBlobStore() {
 
                     case 'syncFromBlob':
                         (async () => {
+                            resolvingConflict = false;
                             console.log('[blob-store] syncFromBlob received:', { dataKeys: Object.keys(data), updatedAt: data.updatedAt });
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
@@ -220,8 +222,9 @@ export function createBlobStore() {
 
                     case 'conflict':
                         console.log('[blob-store] Received conflict from worker:', payload);
-                        // Always sync from blob on conflict, regardless of updatedAt
                         lastSync = null;
+                        resolvingConflict = true;
+                        if (syncTimeout) { clearTimeout(syncTimeout); syncTimeout = null; }
                         console.log('[blob-store] Cleared lastSync due to conflict, triggering syncFromBlob');
                         worker.postMessage({ type: 'syncFromBlob' });
                         break;
@@ -254,9 +257,9 @@ export function createBlobStore() {
             const storageKey = getStorageKey(currentUserId, key);
             memoryCache[storageKey] = value;
 
-            // Don't sync until initial sync from blob is complete
-            if (!initialSyncComplete) {
-                console.log('[blob-store] set() called but initialSyncComplete is false, skipping sync');
+            // Don't sync until initial sync from blob is complete, or while resolving a conflict
+            if (!initialSyncComplete || resolvingConflict) {
+                console.log('[blob-store] set() called but sync blocked (initialSyncComplete:', initialSyncComplete, 'resolvingConflict:', resolvingConflict, ')');
                 return;
             }
 
