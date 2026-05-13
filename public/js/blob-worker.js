@@ -172,7 +172,9 @@ self.onmessage = async function(e) {
                 return;
             }
             if (payload?.lastSync) {
-                lastSync = payload.lastSync;
+                if (!lastSync || new Date(payload.lastSync) > new Date(lastSync)) {
+                    lastSync = payload.lastSync;
+                }
             }
             isSyncing = true;
             try {
