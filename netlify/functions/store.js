@@ -52,15 +52,32 @@ exports.handler = async (event, context) => {
                 const offset = parseInt(event.queryStringParameters?.offset) || 0;
                 const MAX_PAGE_BYTES = 4 * 1024 * 1024; // 4 MB, safely under 6 MB limit
 
+                // Project items to the minimal sync fields. Content (description, etc.)
+                // is cached client-side; the blob may still contain it from older writes
+                // but we don't ship it over the wire.
+                const projectItem = (item) => {
+                    const out = { link: item.link };
+                    if (item.guid != null) out.guid = item.guid;
+                    if (item.title != null) out.title = item.title;
+                    if (item.pubDate != null) out.pubDate = item.pubDate;
+                    if (item.unread != null) out.unread = item.unread;
+                    return out;
+                };
+
                 if (data.feeds && Array.isArray(data.feeds)) {
                     const total = data.feeds.length;
                     const paginatedFeeds = [];
                     let pageBytes = 0;
 
                     for (let i = offset; i < data.feeds.length; i++) {
-                        const feedJson = JSON.stringify(data.feeds[i]);
+                        const sourceFeed = data.feeds[i];
+                        const projectedFeed = {
+                            ...sourceFeed,
+                            items: Array.isArray(sourceFeed.items) ? sourceFeed.items.map(projectItem) : []
+                        };
+                        const feedJson = JSON.stringify(projectedFeed);
                         if (pageBytes + feedJson.length > MAX_PAGE_BYTES && paginatedFeeds.length > 0) break;
-                        paginatedFeeds.push(data.feeds[i]);
+                        paginatedFeeds.push(projectedFeed);
                         pageBytes += feedJson.length;
                     }
 
