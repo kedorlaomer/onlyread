@@ -396,8 +396,16 @@ export function addItemsToFeed(feedUrl, newItems, store) {
             });
             changed = true;
         } else {
-            // Item already exists - preserve local read state
+            // Item already exists locally: preserve local read state, but fill in any
+            // content fields that are missing (e.g. description on an item that arrived
+            // from the server blob without one).
             const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
+            for (const field of ['description', 'title', 'pubDate', 'enclosure', 'guid']) {
+                if (existingItem[field] == null && item[field] != null) {
+                    existingItem[field] = item[field];
+                    changed = true;
+                }
+            }
         }
     }
     

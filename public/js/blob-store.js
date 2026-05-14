@@ -132,6 +132,18 @@ export function createBlobStore() {
     let serverKnownItems = new Map(); // feedUrl -> Set<guid||link> confirmed on server
     let pendingUploadItems = null;    // Map<feedUrl, Set<id>> for items currently being uploaded
 
+    // Strip content-heavy fields (description, enclosure, addedDate) before upload.
+    // The server only needs identity + read-state + minimal display fields; content
+    // is cached locally and refetched from the RSS feed itself.
+    function projectItemForUpload(item) {
+        const out = { link: item.link };
+        if (item.guid != null) out.guid = item.guid;
+        if (item.title != null) out.title = item.title;
+        if (item.pubDate != null) out.pubDate = item.pubDate;
+        if (item.unread != null) out.unread = item.unread;
+        return out;
+    }
+
     // Returns { feeds, uploading } with only items the server doesn't have yet,
     // or null if there is nothing new to upload.
     function buildSyncPayload() {
@@ -147,8 +159,8 @@ export function createBlobStore() {
             const allItems = feed.items || [];
 
             if (!knownIds) {
-                // Feed not yet on server — upload everything
-                filteredFeeds.push(feed);
+                // Feed not yet on server — upload everything (stripped)
+                filteredFeeds.push({ ...feed, items: allItems.map(projectItemForUpload) });
                 uploading.set(feed.url, new Set(allItems.map(i => i.guid || i.link).filter(Boolean)));
             } else {
                 const newItems = allItems.filter(item => {
@@ -156,7 +168,7 @@ export function createBlobStore() {
                     return id && !knownIds.has(id);
                 });
                 if (newItems.length > 0) {
-                    filteredFeeds.push({ ...feed, items: newItems });
+                    filteredFeeds.push({ ...feed, items: newItems.map(projectItemForUpload) });
                     uploading.set(feed.url, new Set(newItems.map(i => i.guid || i.link).filter(Boolean)));
                 }
             }
@@ -164,6 +176,60 @@ export function createBlobStore() {
 
         if (filteredFeeds.length === 0) return null;
         return { feeds: filteredFeeds, uploading };
+    }
+
+    // Merge server feeds into local feeds. Server is authoritative for membership and
+    // unread state; local is authoritative for content fields (description, etc.) since
+    // those are no longer uploaded. Local-only items/feeds (newly added, not yet synced)
+    // are preserved.
+    function mergeFeeds(serverFeeds, localFeeds) {
+        const localByUrl = new Map((localFeeds || []).map(f => [f.url, f]));
+        const serverUrls = new Set(serverFeeds.map(f => f.url));
+        const merged = [];
+
+        for (const serverFeed of serverFeeds) {
+            const localFeed = localByUrl.get(serverFeed.url);
+            if (!localFeed) {
+                merged.push(serverFeed);
+                continue;
+            }
+
+            const localItemsById = new Map();
+            for (const item of (localFeed.items || [])) {
+                const id = item.guid || item.link;
+                if (id) localItemsById.set(id, item);
+            }
+
+            const serverItemIds = new Set();
+            const mergedItems = [];
+
+            for (const serverItem of (serverFeed.items || [])) {
+                const id = serverItem.guid || serverItem.link;
+                if (id) serverItemIds.add(id);
+                const localItem = id ? localItemsById.get(id) : null;
+                if (localItem) {
+                    // Keep local content; take server's unread (it's the cross-device truth)
+                    mergedItems.push({ ...serverItem, ...localItem, unread: serverItem.unread ?? localItem.unread });
+                } else {
+                    mergedItems.push(serverItem);
+                }
+            }
+
+            // Local-only items not yet uploaded
+            for (const localItem of (localFeed.items || [])) {
+                const id = localItem.guid || localItem.link;
+                if (id && !serverItemIds.has(id)) mergedItems.push(localItem);
+            }
+
+            merged.push({ ...serverFeed, ...localFeed, items: mergedItems });
+        }
+
+        // Local-only feeds not yet uploaded
+        for (const localFeed of (localFeeds || [])) {
+            if (!serverUrls.has(localFeed.url)) merged.push(localFeed);
+        }
+
+        return merged;
     }
 
     function sendSync() {
@@ -240,8 +306,13 @@ export function createBlobStore() {
                             }
                             for (const [key, value] of Object.entries(data)) {
                                 const storageKey = getStorageKey(userId, key);
-                                memoryCache[storageKey] = value;
-                                await dbSet(storageKey, value);
+                                let toStore = value;
+                                if (key === 'feeds' && Array.isArray(value)) {
+                                    const localFeeds = memoryCache[storageKey];
+                                    toStore = mergeFeeds(value, Array.isArray(localFeeds) ? localFeeds : []);
+                                }
+                                memoryCache[storageKey] = toStore;
+                                await dbSet(storageKey, toStore);
                             }
                             if (data.updatedAt) {
                                 lastSync = data.updatedAt;
