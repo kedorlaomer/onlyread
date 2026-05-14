@@ -1,5 +1,24 @@
 const { getStore } = require('@netlify/blobs');
 
+// Project items to the minimal sync schema. Descriptions, enclosures, and other
+// content fields are cached client-side; the blob doesn't need them.
+const projectItem = (item) => {
+    const out = { link: item.link };
+    if (item.guid != null) out.guid = item.guid;
+    if (item.title != null) out.title = item.title;
+    if (item.pubDate != null) out.pubDate = item.pubDate;
+    if (item.unread != null) out.unread = item.unread;
+    return out;
+};
+
+const projectFeeds = (feeds) => {
+    if (!Array.isArray(feeds)) return feeds;
+    for (const feed of feeds) {
+        if (Array.isArray(feed.items)) feed.items = feed.items.map(projectItem);
+    }
+    return feeds;
+};
+
 let store = null;
 try {
     store = getStore({
@@ -51,18 +70,6 @@ exports.handler = async (event, context) => {
                 // 6 MB Lambda response limit, regardless of the client's requested limit.
                 const offset = parseInt(event.queryStringParameters?.offset) || 0;
                 const MAX_PAGE_BYTES = 4 * 1024 * 1024; // 4 MB, safely under 6 MB limit
-
-                // Project items to the minimal sync fields. Content (description, etc.)
-                // is cached client-side; the blob may still contain it from older writes
-                // but we don't ship it over the wire.
-                const projectItem = (item) => {
-                    const out = { link: item.link };
-                    if (item.guid != null) out.guid = item.guid;
-                    if (item.title != null) out.title = item.title;
-                    if (item.pubDate != null) out.pubDate = item.pubDate;
-                    if (item.unread != null) out.unread = item.unread;
-                    return out;
-                };
 
                 if (data.feeds && Array.isArray(data.feeds)) {
                     const total = data.feeds.length;
@@ -187,7 +194,7 @@ if (data.action === 'markAllRead') {
                              }
                          }
                          const updatedAt = new Date().toISOString();
-                         await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                         await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
                          return send(200, { success: true, updatedAt });
                      }
 
@@ -202,7 +209,7 @@ if (data.action === 'markAllRead') {
                              }
                          }
                          const updatedAt = new Date().toISOString();
-                         await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                         await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
                          return send(200, { success: true, updatedAt });
                      }
 
@@ -272,7 +279,7 @@ if (data.action === 'markAllRead') {
                 
 // Save merged feeds with timestamp
                  const updatedAt = new Date().toISOString();
-                 await store.setJSON(userId, { feeds: existingFeeds, updatedAt });
+                 await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
                  return send(200, { success: true, feedCount: existingFeeds.length, updatedAt });
             } catch (e) {
                 return send(500, { error: e.message });

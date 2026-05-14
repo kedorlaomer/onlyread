@@ -131,6 +131,7 @@ export function createBlobStore() {
     let resolvingConflict = false;
     let serverKnownItems = new Map(); // feedUrl -> Set<guid||link> confirmed on server
     let pendingUploadItems = null;    // Map<feedUrl, Set<id>> for items currently being uploaded
+    let compactedThisSession = false; // one-time blob compaction trigger per session
 
     // Strip content-heavy fields (description, enclosure, addedDate) before upload.
     // The server only needs identity + read-state + minimal display fields; content
@@ -327,6 +328,10 @@ export function createBlobStore() {
                             window.dispatchEvent(new CustomEvent('onlyread:dataUpdated'));
                             window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: { phase: 'synced' } }));
                             sendSync();
+                            if (!compactedThisSession && worker) {
+                                compactedThisSession = true;
+                                worker.postMessage({ type: 'compact' });
+                            }
                         })();
                         break;
 
@@ -365,6 +370,10 @@ export function createBlobStore() {
 
                     case 'syncProgress':
                         window.dispatchEvent(new CustomEvent('onlyread:syncStatus', { detail: payload }));
+                        break;
+
+                    case 'compacted':
+                        if (e.data.updatedAt) lastSync = e.data.updatedAt;
                         break;
 
                     case 'syncFromBlobError':

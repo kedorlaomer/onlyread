@@ -233,6 +233,25 @@ self.onmessage = async function(e) {
             }
             break;
 
+        case 'compact':
+            // Empty-feeds PUT — server reads, projects all items to strip descriptions,
+            // and writes back. No data semantics change.
+            if (!userId || !blobAvailable) return;
+            try {
+                const response = await fetch(`/.netlify/functions/store/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feeds: [], lastSync })
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.updatedAt) lastSync = result.updatedAt;
+                    self.postMessage({ type: 'compacted', updatedAt: lastSync });
+                }
+            } catch (e) {
+            }
+            break;
+
         case 'stop':
             stopSync();
             self.postMessage({ type: 'stopped' });
