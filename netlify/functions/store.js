@@ -200,13 +200,21 @@ if (data.action === 'markAllRead') {
 
                      if (data.action === 'markItemRead' || data.action === 'markItemUnread') {
                          const isRead = data.action === 'markItemRead';
-                         if (existingFeeds[feedIndex].items && data.itemLink) {
+                         if (!data.itemLink) {
+                             return send(400, { error: 'itemLink is required' });
+                         }
+                         let matched = false;
+                         if (existingFeeds[feedIndex].items) {
                              for (const item of existingFeeds[feedIndex].items) {
                                  if (item.link === data.itemLink) {
                                      item.unread = !isRead;
+                                     matched = true;
                                      break;
                                  }
                              }
+                         }
+                         if (!matched) {
+                             return send(404, { error: 'Item not found' });
                          }
                          const updatedAt = new Date().toISOString();
                          await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
