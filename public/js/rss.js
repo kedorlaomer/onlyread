@@ -384,27 +384,34 @@ export function addItemsToFeed(feedUrl, newItems, store) {
         feeds[feedIndex].items = [];
     }
     
-    const existingLinks = new Set(feeds[feedIndex].items.map(i => i.link));
+    // Canonical identity is guid||link so an item whose URL changed under a stable
+    // guid updates the existing record instead of appearing as a new unread item.
+    const idOf = (i) => i.guid || i.link;
+    const existingById = new Map(feeds[feedIndex].items.map(i => [idOf(i), i]));
     
     let changed = false;
     
     for (const item of newItems) {
-        if (!existingLinks.has(item.link)) {
-            feeds[feedIndex].items.push({
-                ...item,
-                unread: item.unread
-            });
+        const existingItem = existingById.get(idOf(item));
+        if (!existingItem) {
+            const added = { ...item, unread: item.unread };
+            feeds[feedIndex].items.push(added);
+            existingById.set(idOf(added), added);
             changed = true;
         } else {
             // Item already exists locally: preserve local read state, but fill in any
             // content fields that are missing (e.g. description on an item that arrived
             // from the server blob without one).
-            const existingItem = feeds[feedIndex].items.find(i => i.link === item.link);
             for (const field of ['description', 'title', 'pubDate', 'enclosure', 'guid']) {
                 if (existingItem[field] == null && item[field] != null) {
                     existingItem[field] = item[field];
                     changed = true;
                 }
+            }
+            // Refresh the link when the publisher moved the item to a new URL.
+            if (item.link && existingItem.link !== item.link) {
+                existingItem.link = item.link;
+                changed = true;
             }
         }
     }

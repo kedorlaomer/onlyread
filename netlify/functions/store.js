@@ -200,13 +200,20 @@ if (data.action === 'markAllRead') {
 
                      if (data.action === 'markItemRead' || data.action === 'markItemUnread') {
                          const isRead = data.action === 'markItemRead';
-                         if (!data.itemLink) {
-                             return send(400, { error: 'itemLink is required' });
+                         if (!data.itemLink && !data.itemGuid) {
+                             return send(400, { error: 'itemLink or itemGuid is required' });
                          }
+                         const wantGuid = data.itemGuid ?? null;
                          let matched = false;
                          if (existingFeeds[feedIndex].items) {
                              for (const item of existingFeeds[feedIndex].items) {
-                                 if (item.link === data.itemLink) {
+                                 // Canonical identity is guid||link: match on guid when the
+                                 // client sends one, else fall back to link. Matching either
+                                 // keeps items markable when a publisher changes an item's URL
+                                 // under a stable guid.
+                                 const hit = (wantGuid != null && item.guid === wantGuid) ||
+                                     (data.itemLink != null && item.link === data.itemLink);
+                                 if (hit) {
                                      item.unread = !isRead;
                                      matched = true;
                                      break;
@@ -268,17 +275,25 @@ if (data.action === 'markAllRead') {
                                 incomingFeed.items = [];
                             }
                             
-                            // Create set of existing item IDs (prefer guid, fall back to link)
-                            const existingIds = new Set(
-                                existingFeed.items.map(item => item.guid || item.link)
-                            );
+                            // Map existing items by canonical id (prefer guid, fall back to link)
+                            const existingById = new Map();
+                            for (const item of existingFeed.items) {
+                                const id = item.guid || item.link;
+                                if (id) existingById.set(id, item);
+                            }
                             
-                            // Add only new items
+                            // Add new items; for items that already exist by guid, refresh the
+                            // stored link when the publisher moved the item to a new URL so the
+                            // blob and client converge on the current link.
                             for (const item of incomingFeed.items) {
                                 const itemId = item.guid || item.link;
-                                if (itemId && !existingIds.has(itemId)) {
+                                if (!itemId) continue;
+                                const existing = existingById.get(itemId);
+                                if (!existing) {
                                     existingFeed.items.push(item);
-                                    existingIds.add(itemId);
+                                    existingById.set(itemId, item);
+                                } else if (item.link && existing.link !== item.link) {
+                                    existing.link = item.link;
                                 }
                             }
                         }

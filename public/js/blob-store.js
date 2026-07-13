@@ -478,10 +478,12 @@ export function createBlobStore() {
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
             if (feedIndex === -1) return;
 
+            let itemGuid = null;
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
                     if (item.link === itemLink) {
                         item.unread = !isRead;
+                        itemGuid = item.guid ?? null;
                         break;
                     }
                 }
@@ -492,7 +494,7 @@ export function createBlobStore() {
             if (worker) {
                 worker.postMessage({
                     type: isRead ? 'markItemRead' : 'markItemUnread',
-                    payload: { feedUrl, itemLink }
+                    payload: { feedUrl, itemLink, itemGuid }
                 });
             }
         }

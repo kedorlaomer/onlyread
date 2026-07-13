@@ -223,7 +223,7 @@ self.onmessage = async function(e) {
                 const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: isRead ? 'markItemRead' : 'markItemUnread', itemLink: payload.itemLink })
+                    body: JSON.stringify({ action: isRead ? 'markItemRead' : 'markItemUnread', itemLink: payload.itemLink, itemGuid: payload.itemGuid ?? null })
                 });
                 if (response.ok) {
                     const result = await response.json();
