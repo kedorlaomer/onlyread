@@ -26,6 +26,11 @@ let blobStore = null;
 let feedWorker = null;
 let hideRead = false;
 let filteredFeedTitle = null;
+// Session-only view state (not persisted or synced): items the user expanded to
+// full text, and read items pinned visible so they don't vanish under Hide Read
+// until the next reload.
+const expandedItems = new Set();
+const stickyVisible = new Set();
 let renderItemsTimeout = null;
 const RENDER_DEBOUNCE_MS = 150;
 
@@ -262,11 +267,15 @@ function renderItems() {
     }
     
     itemsContainer.innerHTML = '<div class="item-list">' + allItems.map(item => {
-        if (hideRead && item.unread === false) {
-            return `<span id="${getItemId(item)}"></span>`;
+        const itemId = getItemId(item);
+        if (hideRead && item.unread === false && !stickyVisible.has(itemId)) {
+            return `<span id="${itemId}"></span>`;
         }
         const feedTitle = item.feedTitle;
         const dateStr = formatDate(item.pubDate);
+        const isExpanded = expandedItems.has(itemId);
+        const expandLink = `<a class="expand-link" href="#" data-expand-id="${itemId}" title="Show full text">...</a>`;
+        const collapseLink = ` <a class="expand-link" href="#" data-collapse-id="${itemId}" title="Show less">Show less</a>`;
         let titleHtml = '';
 let contentHtml = '';
          
@@ -277,14 +286,23 @@ let contentHtml = '';
             if (item.title) {
                 titleHtml = item.title;
                 if (words.length > 0) {
-                    contentHtml = words.slice(0, 100).join(' ');
-                    if (words.length > 100) contentHtml += '...';
+                    if (isExpanded) {
+                        contentHtml = cleanText + collapseLink;
+                    } else {
+                        contentHtml = words.slice(0, 100).join(' ');
+                        if (words.length > 100) contentHtml += expandLink;
+                    }
                 }
             } else {
-                titleHtml = words.slice(0, 15).join(' ') + '...';
-                if (words.length > 15) {
-                    contentHtml = '...' + words.slice(15, 100).join(' ');
-                    if (words.length > 100) contentHtml += '...';
+                if (isExpanded) {
+                    titleHtml = cleanText;
+                    contentHtml = collapseLink.trim();
+                } else {
+                    titleHtml = words.slice(0, 15).join(' ') + '...';
+                    if (words.length > 15) {
+                        contentHtml = '...' + words.slice(15, 100).join(' ');
+                        if (words.length > 100) contentHtml += expandLink;
+                    }
                 }
             }
         } else {
@@ -504,6 +522,37 @@ netlifyIdentity.on('login', async (user) => {
 });
 
 itemsContainer.addEventListener('click', (e) => {
+    const expandEl = e.target.closest('a[data-expand-id], a[data-collapse-id]');
+    if (expandEl) {
+        e.preventDefault();
+        const collapseId = expandEl.getAttribute('data-collapse-id');
+        if (collapseId) {
+            // Collapse back to truncated text; keep it pinned so it doesn't vanish.
+            expandedItems.delete(collapseId);
+            debouncedRenderItems();
+            return;
+        }
+        const expandId = expandEl.getAttribute('data-expand-id');
+        expandedItems.add(expandId);
+        stickyVisible.add(expandId);
+        // Reading the full text marks it read, but stickyVisible keeps it on screen.
+        const feeds = getFeeds(blobStore);
+        for (const feed of feeds) {
+            if (!feed.items) continue;
+            for (const item of feed.items) {
+                if (getItemId(item) === expandId) {
+                    if (item.unread) {
+                        item.unread = false;
+                        blobStore.markItemReadState(feed.url, item.link, true);
+                    }
+                    break;
+                }
+            }
+        }
+        debouncedRenderItems();
+        return;
+    }
+
     const link = e.target.closest('a[data-item-link]');
     if (link) {
         const itemLink = link.getAttribute('data-item-link');
