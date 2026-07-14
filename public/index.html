@@ -103,13 +103,28 @@
             line-height: 1.5;
         }
         .item-content a.expand-link {
+            display: inline-block;
+            margin-left: 0.35rem;
+            padding: 0.05rem 0.5rem;
+            border: 1px solid #b8d9f5;
+            border-radius: 999px;
+            background: #eaf3fd;
             color: #0078e4;
+            font-size: 0.85em;
+            font-weight: 600;
             text-decoration: none;
             cursor: pointer;
-            font-weight: bold;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s;
         }
         .item-content a.expand-link:hover {
-            text-decoration: underline;
+            background: #d7e9fb;
+            border-color: #0078e4;
+            text-decoration: none;
+        }
+        .item-content a.expand-link .expand-ellipsis {
+            font-weight: 700;
+            letter-spacing: 0.05em;
         }
         .nav-bar {
             display: flex;

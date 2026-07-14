@@ -274,7 +274,7 @@ function renderItems() {
         const feedTitle = item.feedTitle;
         const dateStr = formatDate(item.pubDate);
         const isExpanded = expandedItems.has(itemId);
-        const expandLink = `<a class="expand-link" href="#" data-expand-id="${itemId}" title="Show full text">...</a>`;
+        const expandLink = ` <a class="expand-link" href="#" data-expand-id="${itemId}" title="Show full text"><span class="expand-ellipsis">\u2026</span> Read more</a>`;
         const collapseLink = ` <a class="expand-link" href="#" data-collapse-id="${itemId}" title="Show less">Show less</a>`;
         let titleHtml = '';
 let contentHtml = '';
