@@ -215,11 +215,13 @@ if (data.action === 'deleteFeed') {
                          if (existingFeeds[feedIndex].items) {
                              for (const item of existingFeeds[feedIndex].items) {
                                  // Canonical identity is guid||link: match on guid when the
-                                 // client sends one, else fall back to link. Matching either
-                                 // keeps items markable when a publisher changes an item's URL
-                                 // under a stable guid.
-                                 const hit = (wantGuid != null && item.guid === wantGuid) ||
-                                     (data.itemLink != null && item.link === data.itemLink);
+                                 // client sends one, else fall back to link. When a guid is
+                                 // given, match guid ONLY — link is not unique (some feeds carry
+                                 // several items sharing a link via distinct guids), so a link
+                                 // fallback could hit the wrong colliding-link item first.
+                                 const hit = wantGuid != null
+                                     ? item.guid === wantGuid
+                                     : (data.itemLink != null && item.link === data.itemLink);
                                  if (hit) {
                                      item.unread = !isRead;
                                      matched = true;
