@@ -166,44 +166,104 @@ function parseRfc822Date(dateStr) {
     }
 }
 
-function truncateWords(text, wordCount) {
-    if (!text) return '';
-    const words = text.split(/\s+/);
-    if (words.length <= wordCount) return text;
-    return words.slice(0, wordCount).join(' ') + '...';
-}
-
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function stripHtml(html) {
-    if (!html) return '';
-    
-    // Keep only b, i, u, a, em, strong tags and their content
-    let result = html;
-    
-    // Replace <br> and </p> with newlines
-    result = result.replace(/<br\s*\/?>/gi, '\n');
-    result = result.replace(/<\/p>/gi, '\n\n');
-    
-    // Remove all tags except b, i, u, a, em, strong
-    result = result.replace(/<\/?(?!(b|i|u|a|em|strong)\b)[a-z][a-z0-9]*[^>]*>/gi, '');
-    
-    // Decode common HTML entities
-    result = result.replace(/&nbsp;/gi, ' ');
-    result = result.replace(/&amp;/gi, '&');
-    result = result.replace(/&lt;/gi, '<');
-    result = result.replace(/&gt;/gi, '>');
-    result = result.replace(/&quot;/gi, '"');
-    
-    // Clean up whitespace
-    result = result.replace(/\n\s*\n/g, '\n\n');
-    result = result.replace(/[ \t]+/g, ' ');
-    result = result.trim();
-    
-    return result;
+// Inline tags kept in previews; A also keeps a validated href. Any other tag is
+// unwrapped (its text kept), and every attribute not listed here is dropped by
+// omission — so on* handlers, style, srcset, etc. never survive.
+const SANITIZE_INLINE = { B: 1, I: 1, U: 1, EM: 1, STRONG: 1, CODE: 1, A: 1 };
+// Block/line-break tags that should leave a word boundary when unwrapped, so text
+// from adjacent blocks doesn't run together.
+const SANITIZE_SPACING = { BR: 1, P: 1, DIV: 1, LI: 1, TR: 1, BLOCKQUOTE: 1,
+    H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
+
+// Rebuild a trusted DOM fragment from untrusted feed HTML. Nodes are created fresh
+// in the main document; nothing from the parsed input is carried over except text
+// and, for anchors, an http(s)-only href. This is the whole reason previews are
+// safe to inject as innerHTML downstream — the output contains only these nodes.
+function sanitizeNode(src) {
+    const out = document.createDocumentFragment();
+    for (const child of src.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            out.appendChild(document.createTextNode(child.nodeValue));
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName;
+            if (SANITIZE_INLINE[tag]) {
+                const el = document.createElement(tag.toLowerCase());
+                if (tag === 'A') {
+                    const href = child.getAttribute('href') || '';
+                    if (/^https?:\/\//i.test(href)) {
+                        el.setAttribute('href', href);
+                        el.setAttribute('target', '_blank');
+                        el.setAttribute('rel', 'noopener noreferrer nofollow');
+                        el.setAttribute('class', 'item-link');
+                    }
+                }
+                el.appendChild(sanitizeNode(child));
+                out.appendChild(el);
+            } else {
+                out.appendChild(sanitizeNode(child));
+                if (SANITIZE_SPACING[tag]) out.appendChild(document.createTextNode(' '));
+            }
+        }
+    }
+    return out;
+}
+
+function sanitizeToFragment(html) {
+    if (!html) return document.createDocumentFragment();
+    const parsed = new DOMParser().parseFromString(html, 'text/html');
+    return sanitizeNode(parsed.body);
+}
+
+// Serialize a sanitized fragment to an HTML string. Safe because the fragment was
+// built solely from createElement/createTextNode with whitelisted attributes.
+function fragmentToHtml(frag) {
+    const div = document.createElement('div');
+    div.appendChild(frag.cloneNode(true));
+    return div.innerHTML;
+}
+
+// Serialize the words in [startWord, endWord) of a sanitized fragment to HTML,
+// preserving element structure (so a link split by the cut still closes correctly).
+function truncateFragmentToHtml(frag, endWord, startWord = 0) {
+    let seen = 0; // words encountered so far (across the whole fragment)
+    function walk(src) {
+        const out = document.createDocumentFragment();
+        for (const child of src.childNodes) {
+            if (seen >= endWord) break;
+            if (child.nodeType === Node.TEXT_NODE) {
+                const words = child.nodeValue.split(/\s+/).filter(Boolean);
+                if (words.length === 0) {
+                    if (seen > startWord) out.appendChild(document.createTextNode(child.nodeValue));
+                    continue;
+                }
+                const take = [];
+                for (const w of words) {
+                    if (seen >= startWord && seen < endWord) take.push(w);
+                    seen++;
+                    if (seen >= endWord) break;
+                }
+                if (take.length > 0) {
+                    // Trailing space when more content follows, so this chunk doesn't
+                    // butt against the next sibling element (e.g. a link).
+                    const text = take.join(' ') + (seen < endWord ? ' ' : '');
+                    out.appendChild(document.createTextNode(text));
+                }
+            } else if (child.nodeType === Node.ELEMENT_NODE) {
+                const el = child.cloneNode(false);
+                el.appendChild(walk(child));
+                if (el.childNodes.length > 0) out.appendChild(el);
+            }
+        }
+        return out;
+    }
+    const div = document.createElement('div');
+    div.appendChild(walk(frag));
+    return div.innerHTML;
 }
 
 function getItemId(item) {
@@ -282,33 +342,35 @@ function renderItems() {
 let contentHtml = '';
          
          if (item.description) {
-            const cleanText = stripHtml(item.description);
-            const words = cleanText.split(/\s+/);
+            const frag = sanitizeToFragment(item.description);
+            const cleanText = frag.textContent.replace(/\s+/g, ' ').trim();
+            const wordCount = cleanText ? cleanText.split(' ').length : 0;
             
             if (item.title) {
-                titleHtml = item.title;
-                if (words.length > 0) {
+                titleHtml = escapeHtml(item.title);
+                if (wordCount > 0) {
                     if (isExpanded) {
-                        contentHtml = cleanText + collapseLink;
+                        contentHtml = fragmentToHtml(frag) + collapseLink;
                     } else {
-                        contentHtml = words.slice(0, 100).join(' ');
-                        if (words.length > 100) contentHtml += expandLink;
+                        contentHtml = truncateFragmentToHtml(frag, 100);
+                        if (wordCount > 100) contentHtml += expandLink;
                     }
                 }
             } else {
                 if (isExpanded) {
-                    titleHtml = cleanText;
+                    titleHtml = escapeHtml(cleanText);
                     contentHtml = collapseLink.trim();
                 } else {
-                    titleHtml = words.slice(0, 15).join(' ') + '...';
-                    if (words.length > 15) {
-                        contentHtml = '...' + words.slice(15, 100).join(' ');
-                        if (words.length > 100) contentHtml += expandLink;
+                    const words = cleanText.split(' ');
+                    titleHtml = escapeHtml(words.slice(0, 15).join(' ')) + '...';
+                    if (wordCount > 15) {
+                        contentHtml = '...' + truncateFragmentToHtml(frag, 100, 15);
+                        if (wordCount > 100) contentHtml += expandLink;
                     }
                 }
             }
         } else {
-            titleHtml = feedTitle;
+            titleHtml = escapeHtml(feedTitle);
         }
         
 const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${escapeHtml(item.link)}" data-item-guid="${escapeHtml(item.guid || '')}" title="Mark this item as unread">Mark as unread</a></span>` : '';
