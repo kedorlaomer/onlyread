@@ -187,7 +187,14 @@ exports.handler = async (event, context) => {
                         return send(404, { error: 'Feed not found' });
                     }
 
-if (data.action === 'markAllRead') {
+if (data.action === 'deleteFeed') {
+                         existingFeeds.splice(feedIndex, 1);
+                         const updatedAt = new Date().toISOString();
+                         await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
+                         return send(200, { success: true, updatedAt });
+                     }
+
+                     if (data.action === 'markAllRead') {
                          if (existingFeeds[feedIndex].items) {
                              for (const item of existingFeeds[feedIndex].items) {
                                  item.unread = false;

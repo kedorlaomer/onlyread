@@ -442,6 +442,23 @@ export function createBlobStore() {
             currentUserId = null;
         },
 
+        async deleteFeed(feedUrl) {
+            if (!currentUserId) return;
+            const prefix = `blob_${currentUserId}_`;
+            const feedsKey = `${prefix}feeds`;
+            const feeds = memoryCache[feedsKey];
+            if (!feeds || !Array.isArray(feeds)) return;
+
+            const filtered = feeds.filter(f => f.url !== feedUrl);
+            memoryCache[feedsKey] = filtered;
+            await dbSet(feedsKey, filtered);
+            // Drop server-known tracking so a future re-add re-uploads cleanly.
+            serverKnownItems.delete(feedUrl);
+            if (worker) {
+                worker.postMessage({ type: 'deleteFeed', payload: { feedUrl } });
+            }
+        },
+
         async markFeedAsRead(feedUrl) {
             if (!currentUserId) return;
             const prefix = `blob_${currentUserId}_`;

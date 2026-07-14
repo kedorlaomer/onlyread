@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, removeFeed, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems } from './rss.js';
+import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -147,8 +147,8 @@ function simpleHash(str) {
     return Math.abs(hash).toString(36);
 }
 
-window.removeFeed = function(url) {
-    removeFeed(url, blobStore);
+window.removeFeed = async function(url) {
+    await blobStore.deleteFeed(url);
     renderFeeds();
 };
 

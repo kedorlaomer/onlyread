@@ -197,6 +197,22 @@ self.onmessage = async function(e) {
             await syncFromBlob();
             break;
 
+        case 'deleteFeed':
+            if (!userId || !blobAvailable) return;
+            try {
+                const response = await fetch(`/.netlify/functions/store/${userId}?feedUrl=${encodeURIComponent(payload.feedUrl)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'deleteFeed' })
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.updatedAt) lastSync = result.updatedAt;
+                }
+            } catch (e) {
+            }
+            break;
+
         case 'markAllRead':
             if (!userId || !blobAvailable) {
                 return;
