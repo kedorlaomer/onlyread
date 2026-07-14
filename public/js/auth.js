@@ -207,7 +207,9 @@ function stripHtml(html) {
 }
 
 function getItemId(item) {
-    return simpleHash(item.link);
+    // Use the canonical guid||link identity so items that share a link (some feeds
+    // carry several entries under one link via distinct guids) get distinct DOM ids.
+    return simpleHash(item.guid || item.link);
 }
 
 function markItemAsRead(item, blobStore) {
@@ -217,7 +219,7 @@ function markItemAsRead(item, blobStore) {
         for (const fItem of feed.items) {
             if (fItem.link === item.link) {
                 fItem.unread = false;
-                blobStore.markItemReadState(feed.url, item.link, true);
+                blobStore.markItemReadState(feed.url, fItem.link, fItem.guid ?? null, true);
                 break;
             }
         }
@@ -309,7 +311,7 @@ let contentHtml = '';
             titleHtml = feedTitle;
         }
         
-const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${item.link}" title="Mark this item as unread">Mark as unread</a></span>` : '';
+const markUnreadLink = item.unread === false ? `<span class="item-action"> | <a class="mark-unread-link" href="#" data-item-link="${escapeHtml(item.link)}" data-item-guid="${escapeHtml(item.guid || '')}" title="Mark this item as unread">Mark as unread</a></span>` : '';
 
 const itemClass = item.unread === false ? 'item read' : 'item';
         const feedUrl = item.feedUrl || '';
@@ -321,7 +323,7 @@ const itemClass = item.unread === false ? 'item read' : 'item';
                     <span class="item-feed">(<a class="filter-feed-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" data-feed-url="${escapeHtml(feedUrl)}" title="Show only items from this feed">${feedTitle}</a> | <a class="mark-all-read-link" href="#" data-feed-title="${escapeHtml(feedTitle)}" data-feed-url="${escapeHtml(feedUrl)}" title="Mark all items from this feed as read">Mark all as read</a>${markUnreadLink})</span>
                 </div>
                 <div class="item-title">
-                    <a href="${escapeHtml(item.link)}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${escapeHtml(item.link)}">${titleHtml}</a>
+                    <a href="${escapeHtml(item.link)}" target="_blank" name="${getItemId(item)}" id="${getItemId(item)}" data-item-link="${escapeHtml(item.link)}" data-item-guid="${escapeHtml(item.guid || '')}">${titleHtml}</a>
                 </div>
                 ${contentHtml ? `<div class="item-content">${contentHtml}</div>` : ''}
             </div>
@@ -543,7 +545,7 @@ itemsContainer.addEventListener('click', (e) => {
                 if (getItemId(item) === expandId) {
                     if (item.unread) {
                         item.unread = false;
-                        blobStore.markItemReadState(feed.url, item.link, true);
+                        blobStore.markItemReadState(feed.url, item.link, item.guid ?? null, true);
                     }
                     break;
                 }
@@ -556,6 +558,7 @@ itemsContainer.addEventListener('click', (e) => {
     const link = e.target.closest('a[data-item-link]');
     if (link) {
         const itemLink = link.getAttribute('data-item-link');
+        const itemGuid = link.getAttribute('data-item-guid') || null;
         const itemId = link.id;
         if (itemId) {
             history.replaceState(null, '', `#${itemId}`);
@@ -564,9 +567,10 @@ itemsContainer.addEventListener('click', (e) => {
         for (const feed of feeds) {
             if (!feed.items) continue;
             for (const item of feed.items) {
-                if (item.link === itemLink && item.unread) {
+                const isItem = itemGuid ? item.guid === itemGuid : item.link === itemLink;
+                if (isItem && item.unread) {
                     item.unread = false;
-                    blobStore.markItemReadState(feed.url, itemLink, true);
+                    blobStore.markItemReadState(feed.url, item.link, item.guid ?? null, true);
                     break;
                 }
             }
@@ -627,13 +631,15 @@ itemsContainer.addEventListener('click', async (e) => {
     if (markUnreadLink) {
         e.preventDefault();
         const clickedItemLink = markUnreadLink.getAttribute('data-item-link');
+        const clickedItemGuid = markUnreadLink.getAttribute('data-item-guid') || null;
         const feeds = getFeeds(blobStore);
         for (const feed of feeds) {
             if (!feed.items) continue;
             for (const item of feed.items) {
-                if (item.link === clickedItemLink) {
+                const isItem = clickedItemGuid ? item.guid === clickedItemGuid : item.link === clickedItemLink;
+                if (isItem) {
                     item.unread = true;
-                    blobStore.markItemReadState(feed.url, clickedItemLink, false);
+                    blobStore.markItemReadState(feed.url, item.link, item.guid ?? null, false);
                     break;
                 }
             }

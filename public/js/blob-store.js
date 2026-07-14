@@ -485,7 +485,7 @@ export function createBlobStore() {
             }
         },
 
-        async markItemReadState(feedUrl, itemLink, isRead) {
+        async markItemReadState(feedUrl, itemLink, itemGuid, isRead) {
             if (!currentUserId) return;
             const prefix = `blob_${currentUserId}_`;
             const feedsKey = `${prefix}feeds`;
@@ -495,12 +495,15 @@ export function createBlobStore() {
             const feedIndex = feeds.findIndex(f => f.url === feedUrl);
             if (feedIndex === -1) return;
 
-            let itemGuid = null;
+            // Match on the canonical guid||link identity. Prefer the caller-supplied
+            // guid: a link is not unique (some feeds carry several items sharing one
+            // link via distinct guids), so a link-only lookup can hit the wrong item.
             if (feeds[feedIndex].items) {
                 for (const item of feeds[feedIndex].items) {
-                    if (item.link === itemLink) {
+                    const hit = (itemGuid != null && item.guid === itemGuid) ||
+                        (itemGuid == null && item.link === itemLink);
+                    if (hit) {
                         item.unread = !isRead;
-                        itemGuid = item.guid ?? null;
                         break;
                     }
                 }
