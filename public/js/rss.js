@@ -63,7 +63,13 @@ export function parseFeedItems(text) {
         const title = entry.querySelector('title')?.textContent || null;
         const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
         const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
-        const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
+        // Fall back to media:description (e.g. YouTube feeds have neither content nor
+        // summary). The namespace prefix rules out a CSS selector, so match the
+        // qualified tag name. media:description is plain text, not escaped HTML.
+        const mediaDescEl = entry.getElementsByTagName('media:description')[0];
+        const description = descriptionEl
+            ? unescapeXml(descriptionEl.textContent)
+            : (mediaDescEl ? mediaDescEl.textContent || null : null);
         
         if (link) {
             items.push({
@@ -304,73 +310,6 @@ ${feeds.map(f => `    <outline type="rss" xmlUrl="${escapeXml(f.url)}"/>`).join(
 export function exportFeedsAsText(store) {
     const feeds = getFeeds(store);
     return feeds.map(f => f.url).join('\n');
-}
-
-export async function fetchFeedItems(feedUrl) {
-    try {
-        const { results, errors } = await fetchFeedBatch([feedUrl]);
-        if (errors.length > 0) {
-            return [];
-        }
-        const data = results[0];
-        if (!data || !data.text) {
-            return [];
-        }
-        const text = data.text;
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, 'application/xml');
-        
-        const items = [];
-        
-        // Try RSS 2.0 format
-        const rssItems = xml.querySelectorAll('item');
-        if (rssItems.length > 0) {
-            for (const item of rssItems) {
-                const link = item.querySelector('link')?.textContent || '';
-                const guid = item.querySelector('guid')?.textContent || null;
-                const pubDate = item.querySelector('pubDate')?.textContent || null;
-                const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
-                
-                if (link) {
-                    items.push({
-                        link,
-                        guid,
-                        pubDate,
-                        enclosure,
-                        unread: true,
-                        addedDate: new Date().toISOString()
-                    });
-                }
-            }
-            return items;
-        }
-        
-        // Try Atom format
-        const atomEntries = xml.querySelectorAll('entry');
-        for (const entry of atomEntries) {
-            const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-            const link = linkEl?.getAttribute('href') || '';
-            const guid = entry.querySelector('id')?.textContent || null;
-            const pubDate = entry.querySelector('published')?.textContent || 
-                           entry.querySelector('updated')?.textContent || null;
-            const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
-            
-            if (link) {
-                items.push({
-                    link,
-                    guid,
-                    pubDate,
-                    enclosure,
-                    unread: true,
-                    addedDate: new Date().toISOString()
-                });
-            }
-        }
-        
-        return items;
-    } catch (e) {
-        return [];
-    }
 }
 
 export function addItemsToFeed(feedUrl, newItems, store) {
