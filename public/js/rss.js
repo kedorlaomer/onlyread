@@ -62,14 +62,21 @@ export function parseFeedItems(text) {
                        entry.querySelector('updated')?.textContent || null;
         const title = entry.querySelector('title')?.textContent || null;
         const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
-        const descriptionEl = entry.querySelector('content') || entry.querySelector('summary');
-        // Fall back to media:description (e.g. YouTube feeds have neither content nor
-        // summary). The namespace prefix rules out a CSS selector, so match the
-        // qualified tag name. media:description is plain text, not escaped HTML.
-        const mediaDescEl = entry.getElementsByTagName('media:description')[0];
-        const description = descriptionEl
-            ? unescapeXml(descriptionEl.textContent)
-            : (mediaDescEl ? mediaDescEl.textContent || null : null);
+        // Pick the first candidate with actual text. content/summary are tried first,
+        // then media:description (e.g. YouTube). querySelector('content') also matches
+        // media:content (CSS selectors ignore the namespace prefix), which is an empty
+        // media pointer — so we skip any candidate whose text is blank rather than
+        // stopping at the first element that merely exists.
+        const descCandidates = [
+            entry.querySelector('content'),
+            entry.querySelector('summary'),
+            entry.getElementsByTagName('media:description')[0]
+        ];
+        let description = null;
+        for (const el of descCandidates) {
+            const text = el?.textContent?.trim();
+            if (text) { description = unescapeXml(el.textContent); break; }
+        }
         
         if (link) {
             items.push({
