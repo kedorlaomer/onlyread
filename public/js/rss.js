@@ -10,6 +10,28 @@ function unescapeXml(text) {
         .replace(/&apos;/g, "'");
 }
 
+// Pick the richest description for an item/entry. Feeds vary in where the real
+// content lives: RSS uses description or the namespaced content:encoded; Atom uses
+// content, summary, or media:description. Some also carry a placeholder in one
+// field (e.g. Substack's description is literally "..." while content:encoded holds
+// the full post; YouTube's media:content is an empty pointer). Choosing the longest
+// non-blank candidate sidesteps all of these without per-feed special-casing.
+function pickDescription(el, tagNames) {
+    let best = null;
+    let bestLen = 0;
+    for (const tag of tagNames) {
+        const candidates = tag.includes(':')
+            ? el.getElementsByTagName(tag)
+            : el.querySelectorAll(tag);
+        for (const node of candidates) {
+            const text = node.textContent;
+            const len = text ? text.trim().length : 0;
+            if (len > bestLen) { bestLen = len; best = text; }
+        }
+    }
+    return best ? unescapeXml(best) : null;
+}
+
 export function parseFeedItems(text) {
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'application/xml');
@@ -29,8 +51,7 @@ export function parseFeedItems(text) {
             const title = item.querySelector('title')?.textContent || null;
             const pubDate = item.querySelector('pubDate')?.textContent || null;
             const enclosure = item.querySelector('enclosure')?.getAttribute('url') || null;
-            const descriptionEl = item.querySelector('description');
-            const description = descriptionEl ? unescapeXml(descriptionEl.textContent) : null;
+            const description = pickDescription(item, ['description', 'content:encoded']);
             
             if (link) {
                 items.push({
@@ -62,21 +83,10 @@ export function parseFeedItems(text) {
                        entry.querySelector('updated')?.textContent || null;
         const title = entry.querySelector('title')?.textContent || null;
         const enclosure = entry.querySelector('enclosure')?.getAttribute('url') || null;
-        // Pick the first candidate with actual text. content/summary are tried first,
-        // then media:description (e.g. YouTube). querySelector('content') also matches
-        // media:content (CSS selectors ignore the namespace prefix), which is an empty
-        // media pointer — so we skip any candidate whose text is blank rather than
-        // stopping at the first element that merely exists.
-        const descCandidates = [
-            entry.querySelector('content'),
-            entry.querySelector('summary'),
-            entry.getElementsByTagName('media:description')[0]
-        ];
-        let description = null;
-        for (const el of descCandidates) {
-            const text = el?.textContent?.trim();
-            if (text) { description = unescapeXml(el.textContent); break; }
-        }
+        // querySelector('content') also matches media:content (an empty media pointer)
+        // in YouTube feeds, so pickDescription's longest-non-blank rule is what lets
+        // the real description win over such placeholders.
+        const description = pickDescription(entry, ['content', 'summary', 'media:description']);
         
         if (link) {
             items.push({
