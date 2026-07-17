@@ -341,35 +341,36 @@ function renderItems() {
         let titleHtml = '';
 let contentHtml = '';
          
-         if (item.description) {
-            const frag = sanitizeToFragment(item.description);
-            const cleanText = frag.textContent.replace(/\s+/g, ' ').trim();
-            const wordCount = cleanText ? cleanText.split(' ').length : 0;
-            
-            if (item.title) {
-                titleHtml = escapeHtml(item.title);
-                if (wordCount > 0) {
-                    if (isExpanded) {
-                        contentHtml = fragmentToHtml(frag) + collapseLink;
-                    } else {
-                        contentHtml = truncateFragmentToHtml(frag, 100);
-                        if (wordCount > 100) contentHtml += expandLink;
-                    }
-                }
-            } else {
+         const frag = item.description ? sanitizeToFragment(item.description) : null;
+         const cleanText = frag ? frag.textContent.replace(/\s+/g, ' ').trim() : '';
+         const wordCount = cleanText ? cleanText.split(' ').length : 0;
+
+         if (item.title) {
+            // Item has its own title: use it, and show the description (if any) as content.
+            titleHtml = escapeHtml(item.title);
+            if (wordCount > 0) {
                 if (isExpanded) {
-                    titleHtml = escapeHtml(cleanText);
-                    contentHtml = collapseLink.trim();
+                    contentHtml = fragmentToHtml(frag) + collapseLink;
                 } else {
-                    const words = cleanText.split(' ');
-                    titleHtml = escapeHtml(words.slice(0, 15).join(' ')) + '...';
-                    if (wordCount > 15) {
-                        contentHtml = '...' + truncateFragmentToHtml(frag, 100, 15);
-                        if (wordCount > 100) contentHtml += expandLink;
-                    }
+                    contentHtml = truncateFragmentToHtml(frag, 100);
+                    if (wordCount > 100) contentHtml += expandLink;
+                }
+            }
+        } else if (wordCount > 0) {
+            // No title: derive one from the leading words of the description.
+            if (isExpanded) {
+                titleHtml = escapeHtml(cleanText);
+                contentHtml = collapseLink.trim();
+            } else {
+                const words = cleanText.split(' ');
+                titleHtml = escapeHtml(words.slice(0, 15).join(' ')) + '...';
+                if (wordCount > 15) {
+                    contentHtml = '...' + truncateFragmentToHtml(frag, 100, 15);
+                    if (wordCount > 100) contentHtml += expandLink;
                 }
             }
         } else {
+            // Neither title nor description: fall back to the feed title.
             titleHtml = escapeHtml(feedTitle);
         }
         
