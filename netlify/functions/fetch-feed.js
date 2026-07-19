@@ -11,6 +11,10 @@ try {
     cacheStore = null;
 }
 
+// Identify the fetcher with contact links so publishers can see who we are and
+// reach us, rather than a bare token that stricter feeds tend to block.
+const USER_AGENT = 'OnlyRead/1.0 (+https://onlyread.netlify.app; +https://github.com/kedorlaomer/onlyread)';
+
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_TEXT_SIZE = 4 * 1024 * 1024; // 4MB limit to leave room for overhead
 
@@ -70,7 +74,7 @@ exports.handler = async (event, context) => {
         try {
             const response = await fetch(url, {
                 headers: {
-                    'User-Agent': 'OnlyRead/1.0'
+                    'User-Agent': USER_AGENT
                 }
             });
 
