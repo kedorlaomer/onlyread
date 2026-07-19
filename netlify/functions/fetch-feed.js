@@ -15,8 +15,45 @@ try {
 // reach us, rather than a bare token that stricter feeds tend to block.
 const USER_AGENT = 'OnlyRead/1.0 (+https://onlyread.netlify.app; +https://github.com/kedorlaomer/onlyread)';
 
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const DEFAULT_TTL_MS = 15 * 60 * 1000; // freshness when the origin sends no hint
+const MIN_TTL_MS = 5 * 60 * 1000;       // floor: don't hammer origins that ask for tiny max-age
+const MAX_TTL_MS = 24 * 60 * 60 * 1000; // ceiling: don't trust very long max-age blindly
 const MAX_TEXT_SIZE = 4 * 1024 * 1024; // 4MB limit to leave room for overhead
+
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+// Parse Cache-Control into the bits we act on (RFC 9111 §5.2.2).
+function parseCacheControl(value) {
+    const out = { noStore: false, noCache: false, maxAge: null };
+    if (!value) return out;
+    for (const part of value.split(',')) {
+        const [rawName, rawVal] = part.split('=');
+        const name = rawName.trim().toLowerCase();
+        if (name === 'no-store') out.noStore = true;
+        else if (name === 'no-cache') out.noCache = true;
+        else if (name === 'max-age') {
+            const n = parseInt(rawVal, 10);
+            if (Number.isFinite(n)) out.maxAge = n;
+        }
+    }
+    return out;
+}
+
+// Derive the freshness lifetime (ms) from response headers: Cache-Control max-age
+// first, then Expires, else the default — clamped to a sane window.
+function freshnessMs(cc, response) {
+    let ms = DEFAULT_TTL_MS;
+    if (cc.maxAge != null) {
+        ms = cc.maxAge * 1000;
+    } else {
+        const expires = response.headers.get('expires');
+        if (expires) {
+            const t = Date.parse(expires);
+            if (Number.isFinite(t)) ms = t - Date.now();
+        }
+    }
+    return clamp(ms, MIN_TTL_MS, MAX_TTL_MS);
+}
 
 function makeCacheKey(url) {
     // Simple hash: URL-encoded, with special chars replaced
@@ -55,28 +92,47 @@ exports.handler = async (event, context) => {
     async function fetchOneUrl(url) {
         const cacheKey = makeCacheKey(url);
 
-        // Check cache first
+        // Load any cached entry. A fresh one (age < its stored TTL) is served without
+        // touching the network, unless it was stored no-cache, which must revalidate.
+        let entry = null;
         if (cacheStore) {
             try {
                 const cached = await cacheStore.get(cacheKey);
                 if (cached) {
-                    const parsed = JSON.parse(cached);
-                    const age = Date.now() - parsed.fetchedAt;
-                    if (age < CACHE_TTL_MS) {
-                        return { url, ...parsed.data, cached: true, age };
+                    entry = JSON.parse(cached);
+                    const age = Date.now() - entry.fetchedAt;
+                    if (!entry.data.noCache && age < entry.ttlMs) {
+                        return { url, text: entry.data.text, contentType: entry.data.contentType, cached: true, age };
                     }
                 }
             } catch (e) {
-                // Cache miss or error, proceed to fetch
+                entry = null; // corrupt/missing — treat as no cache
             }
         }
 
         try {
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': USER_AGENT
+            // Stale (or no-cache): revalidate with conditional headers when we hold
+            // validators, so an unchanged feed answers 304 with no body transfer.
+            const reqHeaders = { 'User-Agent': USER_AGENT };
+            if (entry?.data?.etag) reqHeaders['If-None-Match'] = entry.data.etag;
+            if (entry?.data?.lastModified) reqHeaders['If-Modified-Since'] = entry.data.lastModified;
+
+            const response = await fetch(url, { headers: reqHeaders });
+
+            // Not Modified: refresh freshness window, serve the cached body.
+            if (response.status === 304 && entry) {
+                const cc = parseCacheControl(response.headers.get('cache-control'));
+                const ttlMs = freshnessMs(cc, response);
+                if (cacheStore && !cc.noStore) {
+                    try {
+                        entry.data.noCache = cc.noCache;
+                        await cacheStore.set(cacheKey, JSON.stringify({
+                            fetchedAt: Date.now(), ttlMs, data: entry.data
+                        }));
+                    } catch (e) { /* ignore cache write errors */ }
                 }
-            });
+                return { url, text: entry.data.text, contentType: entry.data.contentType, cached: true, revalidated: true };
+            }
 
             if (!response.ok) {
                 return { url, error: `HTTP ${response.status}` };
@@ -91,22 +147,29 @@ exports.handler = async (event, context) => {
                 truncatedText = text.substring(0, MAX_TEXT_SIZE) + '\n\n[...truncated due to size]';
             }
 
-            const result = { text: truncatedText, contentType };
+            const cc = parseCacheControl(response.headers.get('cache-control'));
+            const result = {
+                text: truncatedText,
+                contentType,
+                etag: response.headers.get('etag') || null,
+                lastModified: response.headers.get('last-modified') || null,
+                noCache: cc.noCache
+            };
 
-            // Store in cache
-            if (cacheStore) {
+            // Store unless the origin forbids it (RFC 9111 no-store).
+            if (cacheStore && !cc.noStore) {
                 try {
-                    const cacheData = JSON.stringify({
+                    await cacheStore.set(cacheKey, JSON.stringify({
                         fetchedAt: Date.now(),
+                        ttlMs: freshnessMs(cc, response),
                         data: result
-                    });
-                    await cacheStore.set(cacheKey, cacheData);
+                    }));
                 } catch (e) {
                     // Ignore cache write errors
                 }
             }
 
-            return { url, ...result };
+            return { url, text: result.text, contentType };
         } catch (error) {
             return { url, error: error.message };
         }
