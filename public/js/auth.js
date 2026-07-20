@@ -597,7 +597,15 @@ rlListSelect.addEventListener('change', () => {
 readlaterListsContainer.addEventListener('click', async (e) => {
     const copyBtn = e.target.closest('.rl-copy-btn');
     if (copyBtn) {
-        try { await navigator.clipboard.writeText(copyBtn.getAttribute('data-url')); } catch (err) { /* ignore */ }
+        try {
+            await navigator.clipboard.writeText(copyBtn.getAttribute('data-url'));
+            copyBtn.textContent = 'Copied!';
+            copyBtn.classList.add('copied');
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+                copyBtn.classList.remove('copied');
+            }, 1500);
+        } catch (err) { /* ignore */ }
         return;
     }
 
