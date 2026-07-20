@@ -19,6 +19,30 @@ const projectFeeds = (feeds) => {
     return feeds;
 };
 
+// Read-later lists (readlater:* URLs) accumulate manually-saved items indefinitely,
+// unlike RSS feeds which are naturally bounded by their source. Cap each such list
+// to its newest MAX items, dropping the oldest by pubDate (set to the save time for
+// these items). Regular feeds are left untouched.
+const READLATER_PREFIX = 'readlater:';
+const READLATER_MAX_ITEMS = 1000;
+
+const trimReadLaterFeeds = (feeds) => {
+    if (!Array.isArray(feeds)) return feeds;
+    for (const feed of feeds) {
+        if (!feed || typeof feed.url !== 'string' || !feed.url.startsWith(READLATER_PREFIX)) continue;
+        if (!Array.isArray(feed.items) || feed.items.length <= READLATER_MAX_ITEMS) continue;
+        // Sort newest-first by pubDate; unparseable dates sort last (treated as oldest).
+        feed.items.sort((a, b) => {
+            const ta = Date.parse(a.pubDate); const tb = Date.parse(b.pubDate);
+            const va = Number.isFinite(ta) ? ta : -Infinity;
+            const vb = Number.isFinite(tb) ? tb : -Infinity;
+            return vb - va;
+        });
+        feed.items = feed.items.slice(0, READLATER_MAX_ITEMS);
+    }
+    return feeds;
+};
+
 let store = null;
 try {
     store = getStore({
@@ -311,7 +335,7 @@ if (data.action === 'deleteFeed') {
                 
 // Save merged feeds with timestamp
                  const updatedAt = new Date().toISOString();
-                 await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
+                 await store.setJSON(userId, { feeds: projectFeeds(trimReadLaterFeeds(existingFeeds)), updatedAt });
                  return send(200, { success: true, feedCount: existingFeeds.length, updatedAt });
             } catch (e) {
                 return send(500, { error: e.message });
