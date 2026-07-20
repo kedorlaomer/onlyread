@@ -189,6 +189,7 @@
             <div class="nav-bar">
                 <span id="nav-read" class="nav-link">Read</span>
                 <span id="nav-manage" class="nav-link">Manage</span>
+                <span id="nav-readlater" class="nav-link">Read Later</span>
                 <span id="nav-logout" class="nav-link">Logout</span>
             </div>
             
@@ -200,6 +201,19 @@
                 <div id="items-container"></div>
             </div>
             
+            <div id="page-readlater" class="page hidden">
+                <div class="feed-form">
+                    <h3>Save a link to read later</h3>
+                    <form id="readlater-form" class="pure-form">
+                        <input type="url" id="rl-link" placeholder="https://example.com/article" required>
+                        <input type="text" id="rl-title" placeholder="Title (optional)">
+                        <textarea id="rl-desc" placeholder="Description (optional)"></textarea>
+                        <button type="submit" class="pure-button pure-button-primary">Save</button>
+                    </form>
+                    <div id="readlater-message"></div>
+                </div>
+            </div>
+
             <div id="page-manage" class="page">
                 <h1>Welcome, <span id="user-name"></span>!</h1>
                 

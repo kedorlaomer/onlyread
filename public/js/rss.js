@@ -105,6 +105,56 @@ export function parseFeedItems(text) {
     return { items, title: atomTitle, link: atomLink };
 }
 
+// Reserved pseudo-feed holding manually-saved "read later" items. Its sentinel URL
+// is non-http(s) so it never collides with a real feed and is skipped anywhere we
+// only act on fetchable feeds (the fetch worker, OPML/text export).
+export const READLATER_URL = 'readlater:local';
+export const READLATER_TITLE = 'Read Later';
+
+function hashLink(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return 'readlater:' + Math.abs(hash).toString(36);
+}
+
+// Save a manually-entered item into the Read Later pseudo-feed. link is required;
+// title and description are optional. Deduped by a hash of the link so saving the
+// same URL twice is a no-op. The item flows into the normal Read stream via sync.
+export function addReadLaterItem(link, title, description, store) {
+    if (!validateUrl(link)) {
+        return { success: false, error: 'Invalid URL' };
+    }
+    const feeds = store.get('feeds');
+    const currentFeeds = Array.isArray(feeds) ? feeds : [];
+
+    let feed = currentFeeds.find(f => f.url === READLATER_URL);
+    if (!feed) {
+        feed = { url: READLATER_URL, title: READLATER_TITLE, items: [] };
+        currentFeeds.push(feed);
+    }
+    if (!Array.isArray(feed.items)) feed.items = [];
+
+    const guid = hashLink(link);
+    if (feed.items.some(i => i.guid === guid)) {
+        return { success: false, error: 'Already saved' };
+    }
+
+    feed.items.push({
+        link,
+        guid,
+        title: title || null,
+        description: description || null,
+        pubDate: new Date().toUTCString(),
+        unread: true,
+        addedDate: new Date().toISOString()
+    });
+    store.set('feeds', currentFeeds);
+    return { success: true };
+}
+
 export function validateUrl(string) {
     try {
         const url = new URL(string);
@@ -318,7 +368,7 @@ export function exportFeedsAsOpml(store) {
     <title>OnlyRead Feeds</title>
 </head>
 <body>
-${feeds.map(f => `    <outline type="rss" xmlUrl="${escapeXml(f.url)}"/>`).join('\n')}
+${feeds.filter(f => /^https?:\/\//i.test(f.url)).map(f => `    <outline type="rss" xmlUrl="${escapeXml(f.url)}"/>`).join('\n')}
 </body>
 </opml>`;
     return opml;
@@ -326,7 +376,7 @@ ${feeds.map(f => `    <outline type="rss" xmlUrl="${escapeXml(f.url)}"/>`).join(
 
 export function exportFeedsAsText(store) {
     const feeds = getFeeds(store);
-    return feeds.map(f => f.url).join('\n');
+    return feeds.filter(f => /^https?:\/\//i.test(f.url)).map(f => f.url).join('\n');
 }
 
 export function addItemsToFeed(feedUrl, newItems, store) {

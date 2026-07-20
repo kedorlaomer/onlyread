@@ -40,7 +40,8 @@ self.onmessage = async function(e) {
             break;
 
         case 'feeds':
-            const feedUrls = payload.feeds.map(f => f.url);
+            // Only fetch real feeds; pseudo-feeds (e.g. read-later) use non-http URLs.
+            const feedUrls = payload.feeds.map(f => f.url).filter(u => /^https?:\/\//i.test(u));
             const batches = chunkArray(feedUrls, BATCH_SIZE);
             
             for (let i = 0; i < batches.length; i++) {

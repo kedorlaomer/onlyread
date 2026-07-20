@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems } from './rss.js';
+import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems, addReadLaterItem } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -18,9 +18,13 @@ const itemsContainer = document.getElementById('items-container');
 
 const navRead = document.getElementById('nav-read');
 const navManage = document.getElementById('nav-manage');
+const navReadlater = document.getElementById('nav-readlater');
 const navLogout = document.getElementById('nav-logout');
 const pageRead = document.getElementById('page-read');
 const pageManage = document.getElementById('page-manage');
+const pageReadlater = document.getElementById('page-readlater');
+const readlaterForm = document.getElementById('readlater-form');
+const readlaterMessage = document.getElementById('readlater-message');
 
 let blobStore = null;
 let feedWorker = null;
@@ -47,8 +51,10 @@ function debouncedRenderItems() {
 function showPage(pageName) {
     navRead.classList.remove('active');
     navManage.classList.remove('active');
+    navReadlater.classList.remove('active');
     pageRead.classList.add('hidden');
     pageManage.classList.add('hidden');
+    pageReadlater.classList.add('hidden');
     
     if (pageName === 'read') {
         navRead.classList.add('active');
@@ -58,11 +64,15 @@ function showPage(pageName) {
         navManage.classList.add('active');
         pageManage.classList.remove('hidden');
         renderFeeds();
+    } else if (pageName === 'readlater') {
+        navReadlater.classList.add('active');
+        pageReadlater.classList.remove('hidden');
     }
 }
 
 navRead.addEventListener('click', () => showPage('read'));
 navManage.addEventListener('click', () => showPage('manage'));
+navReadlater.addEventListener('click', () => showPage('readlater'));
 navLogout.addEventListener('click', () => {
     stopFeedWorker();
     netlifyIdentity.logout();
@@ -523,6 +533,26 @@ subscribeForm.addEventListener('submit', async (e) => {
     } else {
         feedMessage.textContent = result.error;
         feedMessage.className = 'error';
+    }
+});
+
+readlaterForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const link = document.getElementById('rl-link').value.trim();
+    const title = document.getElementById('rl-title').value.trim();
+    const desc = document.getElementById('rl-desc').value.trim();
+
+    const result = addReadLaterItem(link, title, desc, blobStore);
+
+    if (result.success) {
+        readlaterMessage.textContent = 'Saved!';
+        readlaterMessage.className = 'success';
+        document.getElementById('rl-link').value = '';
+        document.getElementById('rl-title').value = '';
+        document.getElementById('rl-desc').value = '';
+    } else {
+        readlaterMessage.textContent = result.error;
+        readlaterMessage.className = 'error';
     }
 });
 
