@@ -15,7 +15,7 @@ try {
 // reach us, rather than a bare token that stricter feeds tend to block.
 const USER_AGENT = 'OnlyRead/1.0 (+https://onlyread.netlify.app; +https://github.com/kedorlaomer/onlyread)';
 
-const DEFAULT_TTL_MS = 15 * 60 * 1000; // freshness when the origin sends no hint
+const DEFAULT_TTL_MS = 60 * 60 * 1000; // freshness when the origin sends no hint
 const MIN_TTL_MS = 5 * 60 * 1000;       // floor: don't hammer origins that ask for tiny max-age
 const MAX_TTL_MS = 24 * 60 * 60 * 1000; // ceiling: don't trust very long max-age blindly
 const MAX_TEXT_SIZE = 4 * 1024 * 1024; // 4MB limit to leave room for overhead
