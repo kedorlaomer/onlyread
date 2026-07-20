@@ -23,7 +23,10 @@ const cdata = (str) => `<![CDATA[${String(str == null ? '' : str).replace(/]]>/g
 exports.handler = async (event) => {
     const notFound = { statusCode: 404, headers: { 'Content-Type': 'text/plain' }, body: 'Not found' };
 
-    const token = event.queryStringParameters?.token;
+    // Token may arrive as a query param (direct call) or in the path (pretty
+    // /feed/<token> rewrite); accept either.
+    const pathToken = (event.path || '').split('/').filter(Boolean).pop();
+    const token = event.queryStringParameters?.token || pathToken;
     if (!token || !/^[0-9a-f]{8,}$/i.test(token)) return notFound;
     if (!store || !shareIndex) return { statusCode: 500, body: 'Not configured' };
 
