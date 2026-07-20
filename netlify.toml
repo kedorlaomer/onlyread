@@ -10,3 +10,8 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/feed/:token"
+  to = "/.netlify/functions/feed?token=:token"
+  status = 200

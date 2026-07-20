@@ -54,9 +54,22 @@ function renderReadLaterLists() {
     readlaterListsContainer.innerHTML = lists.map(l => {
         const feed = feeds.find(f => f.url === l.url);
         const count = feed && Array.isArray(feed.items) ? feed.items.length : 0;
+        const isPublic = !!(feed && feed.public && feed.shareToken);
+        const shareUrl = isPublic ? `${location.origin}/feed/${feed.shareToken}` : '';
+        const shareBlock = isPublic
+            ? `<div class="rl-share">
+                    <input type="text" class="rl-share-url" value="${escapeHtml(shareUrl)}" readonly>
+                    <button class="pure-button pure-button-small rl-copy-btn" data-url="${escapeHtml(shareUrl)}">Copy</button>
+                    <button class="pure-button pure-button-small rl-rotate-btn" data-list-url="${escapeHtml(l.url)}">Rotate link</button>
+                    <button class="pure-button pure-button-small rl-unpublish-btn" data-list-url="${escapeHtml(l.url)}">Unpublish</button>
+                </div>`
+            : `<button class="pure-button pure-button-small rl-publish-btn" data-list-url="${escapeHtml(l.url)}">Publish</button>`;
         return `<div class="readlater-list-row">
-            <span>${escapeHtml(l.title)} (${count})</span>
-            <button class="pure-button pure-button-small rl-delete-btn" data-list-url="${escapeHtml(l.url)}" data-list-title="${escapeHtml(l.title)}">Delete</button>
+            <div class="rl-list-head">
+                <span>${escapeHtml(l.title)} (${count})${isPublic ? ' · public' : ''}</span>
+                <button class="pure-button pure-button-small rl-delete-btn" data-list-url="${escapeHtml(l.url)}" data-list-title="${escapeHtml(l.title)}">Delete</button>
+            </div>
+            ${shareBlock}
         </div>`;
     }).join('');
 }
@@ -578,6 +591,34 @@ rlListSelect.addEventListener('change', () => {
 });
 
 readlaterListsContainer.addEventListener('click', async (e) => {
+    const copyBtn = e.target.closest('.rl-copy-btn');
+    if (copyBtn) {
+        try { await navigator.clipboard.writeText(copyBtn.getAttribute('data-url')); } catch (err) { /* ignore */ }
+        return;
+    }
+
+    const publishBtn = e.target.closest('.rl-publish-btn');
+    if (publishBtn) {
+        await blobStore.shareListAction(publishBtn.getAttribute('data-list-url'), 'publishList');
+        renderReadLaterLists();
+        return;
+    }
+
+    const rotateBtn = e.target.closest('.rl-rotate-btn');
+    if (rotateBtn) {
+        if (!confirm('Rotate the link? The current public URL will stop working.')) return;
+        await blobStore.shareListAction(rotateBtn.getAttribute('data-list-url'), 'rotateListToken');
+        renderReadLaterLists();
+        return;
+    }
+
+    const unpublishBtn = e.target.closest('.rl-unpublish-btn');
+    if (unpublishBtn) {
+        await blobStore.shareListAction(unpublishBtn.getAttribute('data-list-url'), 'unpublishList');
+        renderReadLaterLists();
+        return;
+    }
+
     const btn = e.target.closest('.rl-delete-btn');
     if (!btn) return;
     const url = btn.getAttribute('data-list-url');

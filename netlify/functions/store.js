@@ -1,20 +1,28 @@
 const { getStore } = require('@netlify/blobs');
 
+const READLATER_PREFIX = 'readlater:';
+const READLATER_MAX_ITEMS = 1000;
+
 // Project items to the minimal sync schema. Descriptions, enclosures, and other
-// content fields are cached client-side; the blob doesn't need them.
-const projectItem = (item) => {
+// content fields are cached client-side; the blob doesn't need them. Exception:
+// read-later items are manually saved, so their description is not re-fetchable
+// from any source feed and must be persisted (also required to publish it in the
+// outbound RSS feed).
+const projectItem = (item, keepDescription) => {
     const out = { link: item.link };
     if (item.guid != null) out.guid = item.guid;
     if (item.title != null) out.title = item.title;
     if (item.pubDate != null) out.pubDate = item.pubDate;
     if (item.unread != null) out.unread = item.unread;
+    if (keepDescription && item.description != null) out.description = item.description;
     return out;
 };
 
 const projectFeeds = (feeds) => {
     if (!Array.isArray(feeds)) return feeds;
     for (const feed of feeds) {
-        if (Array.isArray(feed.items)) feed.items = feed.items.map(projectItem);
+        const keepDescription = typeof feed.url === 'string' && feed.url.startsWith(READLATER_PREFIX);
+        if (Array.isArray(feed.items)) feed.items = feed.items.map(i => projectItem(i, keepDescription));
     }
     return feeds;
 };
@@ -23,8 +31,9 @@ const projectFeeds = (feeds) => {
 // unlike RSS feeds which are naturally bounded by their source. Cap each such list
 // to its newest MAX items, dropping the oldest by pubDate (set to the save time for
 // these items). Regular feeds are left untouched.
-const READLATER_PREFIX = 'readlater:';
-const READLATER_MAX_ITEMS = 1000;
+
+const newShareToken = () =>
+    (require('crypto').randomBytes(16).toString('hex'));
 
 const trimReadLaterFeeds = (feeds) => {
     if (!Array.isArray(feeds)) return feeds;
@@ -44,14 +53,22 @@ const trimReadLaterFeeds = (feeds) => {
 };
 
 let store = null;
+let shareIndex = null;
 try {
     store = getStore({
         name: 'user-data',
         siteID: process.env.SITE_ID,
         token: process.env.BLOB_TOKEN
     });
+    // Maps a public share token -> { userId, listUrl } for outbound read-later feeds.
+    shareIndex = getStore({
+        name: 'share-index',
+        siteID: process.env.SITE_ID,
+        token: process.env.BLOB_TOKEN
+    });
 } catch (err) {
     store = null;
+    shareIndex = null;
 }
 
 exports.handler = async (event, context) => {
@@ -212,10 +229,51 @@ exports.handler = async (event, context) => {
                     }
 
 if (data.action === 'deleteFeed') {
+                         const removed = existingFeeds[feedIndex];
                          existingFeeds.splice(feedIndex, 1);
+                         // Tear down any public share for this list.
+                         if (shareIndex && removed && removed.shareToken) {
+                             try { await shareIndex.delete(removed.shareToken); } catch (e) { /* ignore */ }
+                         }
                          const updatedAt = new Date().toISOString();
                          await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
                          return send(200, { success: true, updatedAt });
+                     }
+
+                     if (data.action === 'publishList' || data.action === 'rotateListToken' || data.action === 'unpublishList') {
+                         if (!feedUrl.startsWith(READLATER_PREFIX)) {
+                             return send(400, { error: 'Only read-later lists can be shared' });
+                         }
+                         if (!shareIndex) {
+                             return send(500, { error: 'Share index not configured' });
+                         }
+                         const feed = existingFeeds[feedIndex];
+                         const oldToken = feed.shareToken || null;
+
+                         if (data.action === 'unpublishList') {
+                             feed.public = false;
+                             delete feed.shareToken;
+                             if (oldToken) { try { await shareIndex.delete(oldToken); } catch (e) { /* ignore */ } }
+                         } else {
+                             // publishList reuses an existing token; rotateListToken always mints a new one.
+                             if (data.action === 'rotateListToken' && oldToken) {
+                                 try { await shareIndex.delete(oldToken); } catch (e) { /* ignore */ }
+                             }
+                             if (data.action === 'rotateListToken' || !feed.shareToken) {
+                                 feed.shareToken = newShareToken();
+                             }
+                             feed.public = true;
+                             await shareIndex.setJSON(feed.shareToken, { userId, listUrl: feedUrl });
+                         }
+
+                         const updatedAt = new Date().toISOString();
+                         await store.setJSON(userId, { feeds: projectFeeds(existingFeeds), updatedAt });
+                         return send(200, {
+                             success: true,
+                             updatedAt,
+                             public: !!feed.public,
+                             shareToken: feed.shareToken || null
+                         });
                      }
 
                      if (data.action === 'markAllRead') {

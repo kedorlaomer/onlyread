@@ -135,13 +135,16 @@ export function createBlobStore() {
 
     // Strip content-heavy fields (description, enclosure, addedDate) before upload.
     // The server only needs identity + read-state + minimal display fields; content
-    // is cached locally and refetched from the RSS feed itself.
-    function projectItemForUpload(item) {
+    // is cached locally and refetched from the RSS feed itself. Exception: read-later
+    // items are manually saved (no source feed to refetch from) and their description
+    // is published in the outbound feed, so keep it for those.
+    function projectItemForUpload(item, keepDescription) {
         const out = { link: item.link };
         if (item.guid != null) out.guid = item.guid;
         if (item.title != null) out.title = item.title;
         if (item.pubDate != null) out.pubDate = item.pubDate;
         if (item.unread != null) out.unread = item.unread;
+        if (keepDescription && item.description != null) out.description = item.description;
         return out;
     }
 
@@ -156,12 +159,13 @@ export function createBlobStore() {
 
         for (const feed of feeds) {
             if (!feed.url) continue;
+            const keepDescription = feed.url.startsWith('readlater:');
             const knownIds = serverKnownItems.get(feed.url);
             const allItems = feed.items || [];
 
             if (!knownIds) {
                 // Feed not yet on server — upload everything (stripped)
-                filteredFeeds.push({ ...feed, items: allItems.map(projectItemForUpload) });
+                filteredFeeds.push({ ...feed, items: allItems.map(i => projectItemForUpload(i, keepDescription)) });
                 uploading.set(feed.url, new Set(allItems.map(i => i.guid || i.link).filter(Boolean)));
             } else {
                 const newItems = allItems.filter(item => {
@@ -169,7 +173,7 @@ export function createBlobStore() {
                     return id && !knownIds.has(id);
                 });
                 if (newItems.length > 0) {
-                    filteredFeeds.push({ ...feed, items: newItems.map(projectItemForUpload) });
+                    filteredFeeds.push({ ...feed, items: newItems.map(i => projectItemForUpload(i, keepDescription)) });
                     uploading.set(feed.url, new Set(newItems.map(i => i.guid || i.link).filter(Boolean)));
                 }
             }
@@ -440,6 +444,36 @@ export function createBlobStore() {
             }
             ready = false;
             currentUserId = null;
+        },
+
+        // Publish / rotate / unpublish a read-later list's outbound feed. Returns the
+        // server response ({ success, public, shareToken }) so the caller can show the
+        // share URL. Updates the local feed's public/shareToken to match.
+        async shareListAction(feedUrl, action) {
+            if (!currentUserId) return { success: false, error: 'Not ready' };
+            try {
+                const res = await fetch(`/.netlify/functions/store/${currentUserId}?feedUrl=${encodeURIComponent(feedUrl)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    const feedsKey = `blob_${currentUserId}_feeds`;
+                    const feeds = memoryCache[feedsKey];
+                    const feed = Array.isArray(feeds) ? feeds.find(f => f.url === feedUrl) : null;
+                    if (feed) {
+                        feed.public = result.public;
+                        if (result.shareToken) feed.shareToken = result.shareToken;
+                        else delete feed.shareToken;
+                        await dbSet(feedsKey, feeds);
+                    }
+                    return result;
+                }
+                return { success: false, error: result.error || 'Request failed' };
+            } catch (e) {
+                return { success: false, error: e.message };
+            }
         },
 
         async deleteFeed(feedUrl) {

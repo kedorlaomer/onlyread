@@ -59,12 +59,26 @@
             margin-top: 0.25rem;
         }
         .readlater-list-row {
+            max-width: 32rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .readlater-list-row .rl-list-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            max-width: 32rem;
-            padding: 0.4rem 0;
-            border-bottom: 1px solid #f0f0f0;
+        }
+        .readlater-list-row .rl-share {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .readlater-list-row .rl-share-url {
+            flex: 1 1 14rem;
+            min-width: 10rem;
+            font-size: 0.85em;
         }
         .error {
             color: red;
