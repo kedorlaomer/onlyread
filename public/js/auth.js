@@ -60,10 +60,12 @@ function renderReadLaterLists() {
             `<button class="pure-button pure-button-small rl-publish-btn" data-list-url="${escapeHtml(l.url)}">Publish</button>`;
         const shareBlock = isPublic
             ? `<div class="rl-share">
-                    <input type="text" class="rl-share-url" value="${escapeHtml(shareUrl)}" readonly>
-                    <button class="pure-button pure-button-small rl-copy-btn" data-url="${escapeHtml(shareUrl)}">Copy</button>
-                    <button class="pure-button pure-button-small rl-rotate-btn" data-list-url="${escapeHtml(l.url)}">Rotate link</button>
-                    <button class="pure-button pure-button-small rl-unpublish-btn" data-list-url="${escapeHtml(l.url)}">Unpublish</button>
+                    <a class="rl-share-url" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener">${escapeHtml(shareUrl)}</a>
+                    <div class="rl-share-actions">
+                        <button class="pure-button pure-button-small rl-copy-btn" data-url="${escapeHtml(shareUrl)}">Copy</button>
+                        <button class="pure-button pure-button-small rl-rotate-btn" data-list-url="${escapeHtml(l.url)}">Rotate link</button>
+                        <button class="pure-button pure-button-small rl-unpublish-btn" data-list-url="${escapeHtml(l.url)}">Unpublish</button>
+                    </div>
                 </div>`
             : '';
         return `<div class="readlater-list-row">
