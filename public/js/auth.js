@@ -56,6 +56,8 @@ function renderReadLaterLists() {
         const count = feed && Array.isArray(feed.items) ? feed.items.length : 0;
         const isPublic = !!(feed && feed.public && feed.shareToken);
         const shareUrl = isPublic ? `${location.origin}/feed/${feed.shareToken}` : '';
+        const publishBtn = isPublic ? '' :
+            `<button class="pure-button pure-button-small rl-publish-btn" data-list-url="${escapeHtml(l.url)}">Publish</button>`;
         const shareBlock = isPublic
             ? `<div class="rl-share">
                     <input type="text" class="rl-share-url" value="${escapeHtml(shareUrl)}" readonly>
@@ -63,11 +65,11 @@ function renderReadLaterLists() {
                     <button class="pure-button pure-button-small rl-rotate-btn" data-list-url="${escapeHtml(l.url)}">Rotate link</button>
                     <button class="pure-button pure-button-small rl-unpublish-btn" data-list-url="${escapeHtml(l.url)}">Unpublish</button>
                 </div>`
-            : `<button class="pure-button pure-button-small rl-publish-btn" data-list-url="${escapeHtml(l.url)}">Publish</button>`;
+            : '';
         return `<div class="readlater-list-row">
             <div class="rl-list-head">
                 <span>${escapeHtml(l.title)} (${count})${isPublic ? ' · public' : ''}</span>
-                <button class="pure-button pure-button-small rl-delete-btn" data-list-url="${escapeHtml(l.url)}" data-list-title="${escapeHtml(l.title)}">Delete</button>
+                <span class="rl-list-actions">${publishBtn}<button class="pure-button pure-button-small rl-delete-btn" data-list-url="${escapeHtml(l.url)}" data-list-title="${escapeHtml(l.title)}">Delete</button></span>
             </div>
             ${shareBlock}
         </div>`;
