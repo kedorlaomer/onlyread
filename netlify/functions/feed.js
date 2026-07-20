@@ -81,7 +81,10 @@ ${itemsXml}
         statusCode: 200,
         headers: {
             'Content-Type': 'application/rss+xml; charset=utf-8',
-            'Cache-Control': 'max-age=900',
+            // Let clients cache briefly, but keep the CDN copy revalidated so a
+            // rotate/unpublish takes effect promptly rather than lingering 15 min.
+            'Cache-Control': 'public, max-age=300',
+            'Netlify-CDN-Cache-Control': 'public, max-age=0, must-revalidate',
             'Access-Control-Allow-Origin': '*'
         },
         body: xml
