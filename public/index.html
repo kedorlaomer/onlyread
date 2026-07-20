@@ -58,6 +58,14 @@
         .feed-form .pure-form button {
             margin-top: 0.25rem;
         }
+        .readlater-list-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 32rem;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
         .error {
             color: red;
             margin-top: 0.5rem;
@@ -239,6 +247,10 @@
                         <button type="submit" class="pure-button pure-button-primary">Save</button>
                     </form>
                     <div id="readlater-message"></div>
+                </div>
+                <div class="feed-form">
+                    <h3>Your lists</h3>
+                    <div id="readlater-lists"></div>
                 </div>
             </div>
 

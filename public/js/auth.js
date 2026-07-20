@@ -27,6 +27,7 @@ const readlaterForm = document.getElementById('readlater-form');
 const readlaterMessage = document.getElementById('readlater-message');
 const rlListSelect = document.getElementById('rl-list');
 const rlNewListInput = document.getElementById('rl-newlist');
+const readlaterListsContainer = document.getElementById('readlater-lists');
 
 // Sentinel option value for "create a new list" in the list dropdown.
 const RL_NEW = '__new__';
@@ -43,6 +44,21 @@ function populateReadLaterLists() {
         rlListSelect.value = prev;
     }
     rlNewListInput.classList.toggle('hidden', rlListSelect.value !== RL_NEW);
+    renderReadLaterLists();
+}
+
+function renderReadLaterLists() {
+    if (!blobStore) return;
+    const lists = getReadLaterLists(blobStore);
+    const feeds = getFeeds(blobStore);
+    readlaterListsContainer.innerHTML = lists.map(l => {
+        const feed = feeds.find(f => f.url === l.url);
+        const count = feed && Array.isArray(feed.items) ? feed.items.length : 0;
+        return `<div class="readlater-list-row">
+            <span>${escapeHtml(l.title)} (${count})</span>
+            <button class="pure-button pure-button-small rl-delete-btn" data-list-url="${escapeHtml(l.url)}" data-list-title="${escapeHtml(l.title)}">Delete</button>
+        </div>`;
+    }).join('');
 }
 
 let blobStore = null;
@@ -559,6 +575,17 @@ subscribeForm.addEventListener('submit', async (e) => {
 rlListSelect.addEventListener('change', () => {
     rlNewListInput.classList.toggle('hidden', rlListSelect.value !== RL_NEW);
     if (rlListSelect.value === RL_NEW) rlNewListInput.focus();
+});
+
+readlaterListsContainer.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.rl-delete-btn');
+    if (!btn) return;
+    const url = btn.getAttribute('data-list-url');
+    const title = btn.getAttribute('data-list-title') || url;
+    if (!confirm(`Delete the list "${title}" and all its saved items?`)) return;
+    await blobStore.deleteFeed(url);
+    populateReadLaterLists();
+    debouncedRenderItems();
 });
 
 readlaterForm.addEventListener('submit', (e) => {
