@@ -105,11 +105,13 @@ export function parseFeedItems(text) {
     return { items, title: atomTitle, link: atomLink };
 }
 
-// Reserved pseudo-feed holding manually-saved "read later" items. Its sentinel URL
-// is non-http(s) so it never collides with a real feed and is skipped anywhere we
-// only act on fetchable feeds (the fetch worker, OPML/text export).
+// Reserved pseudo-feeds holding manually-saved "read later" items. Their sentinel
+// URLs share the readlater: scheme (non-http(s)), so they never collide with real
+// feeds and are skipped anywhere we only act on fetchable feeds (the fetch worker,
+// OPML/text export). The default list is readlater:local; more can be created.
 export const READLATER_URL = 'readlater:local';
 export const READLATER_TITLE = 'Read Later';
+export const READLATER_PREFIX = 'readlater:';
 
 function hashLink(str) {
     let hash = 0;
@@ -120,19 +122,45 @@ function hashLink(str) {
     return 'readlater:' + Math.abs(hash).toString(36);
 }
 
-// Save a manually-entered item into the Read Later pseudo-feed. link is required;
-// title and description are optional. Deduped by a hash of the link so saving the
-// same URL twice is a no-op. The item flows into the normal Read stream via sync.
-export function addReadLaterItem(link, title, description, store) {
+// Derive a sentinel URL for a new named list from its title.
+export function readLaterUrlForName(name) {
+    const slug = name.trim().toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return slug ? READLATER_PREFIX + slug : null;
+}
+
+// All read-later lists currently in the store, as { url, title }. Always includes
+// the default list even before anything is saved to it.
+export function getReadLaterLists(store) {
+    const feeds = store.get('feeds');
+    const lists = (Array.isArray(feeds) ? feeds : [])
+        .filter(f => typeof f.url === 'string' && f.url.startsWith(READLATER_PREFIX))
+        .map(f => ({ url: f.url, title: f.title || f.url }));
+    if (!lists.some(l => l.url === READLATER_URL)) {
+        lists.unshift({ url: READLATER_URL, title: READLATER_TITLE });
+    }
+    return lists;
+}
+
+// Save a manually-entered item into a read-later list. link is required; title and
+// description are optional. listUrl/listTitle select the target list (defaulting to
+// the standard Read Later list), creating it if absent. Deduped by a hash of the
+// link so saving the same URL twice into the same list is a no-op. The item flows
+// into the normal Read stream via sync.
+export function addReadLaterItem(link, title, description, store, listUrl = READLATER_URL, listTitle = READLATER_TITLE) {
     if (!validateUrl(link)) {
         return { success: false, error: 'Invalid URL' };
+    }
+    if (typeof listUrl !== 'string' || !listUrl.startsWith(READLATER_PREFIX)) {
+        return { success: false, error: 'Invalid list' };
     }
     const feeds = store.get('feeds');
     const currentFeeds = Array.isArray(feeds) ? feeds : [];
 
-    let feed = currentFeeds.find(f => f.url === READLATER_URL);
+    let feed = currentFeeds.find(f => f.url === listUrl);
     if (!feed) {
-        feed = { url: READLATER_URL, title: READLATER_TITLE, items: [] };
+        feed = { url: listUrl, title: listTitle || listUrl, items: [] };
         currentFeeds.push(feed);
     }
     if (!Array.isArray(feed.items)) feed.items = [];

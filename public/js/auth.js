@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems, addReadLaterItem } from './rss.js';
+import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems, addReadLaterItem, getReadLaterLists, readLaterUrlForName } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -25,6 +25,25 @@ const pageManage = document.getElementById('page-manage');
 const pageReadlater = document.getElementById('page-readlater');
 const readlaterForm = document.getElementById('readlater-form');
 const readlaterMessage = document.getElementById('readlater-message');
+const rlListSelect = document.getElementById('rl-list');
+const rlNewListInput = document.getElementById('rl-newlist');
+
+// Sentinel option value for "create a new list" in the list dropdown.
+const RL_NEW = '__new__';
+
+function populateReadLaterLists() {
+    if (!blobStore) return;
+    const lists = getReadLaterLists(blobStore);
+    const prev = rlListSelect.value;
+    rlListSelect.innerHTML = lists.map(l =>
+        `<option value="${escapeHtml(l.url)}">${escapeHtml(l.title)}</option>`
+    ).join('') + `<option value="${RL_NEW}">+ New list…</option>`;
+    // Restore prior selection when still present.
+    if (prev && [...rlListSelect.options].some(o => o.value === prev)) {
+        rlListSelect.value = prev;
+    }
+    rlNewListInput.classList.toggle('hidden', rlListSelect.value !== RL_NEW);
+}
 
 let blobStore = null;
 let feedWorker = null;
@@ -67,6 +86,7 @@ function showPage(pageName) {
     } else if (pageName === 'readlater') {
         navReadlater.classList.add('active');
         pageReadlater.classList.remove('hidden');
+        populateReadLaterLists();
     }
 }
 
@@ -536,13 +556,37 @@ subscribeForm.addEventListener('submit', async (e) => {
     }
 });
 
+rlListSelect.addEventListener('change', () => {
+    rlNewListInput.classList.toggle('hidden', rlListSelect.value !== RL_NEW);
+    if (rlListSelect.value === RL_NEW) rlNewListInput.focus();
+});
+
 readlaterForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const link = document.getElementById('rl-link').value.trim();
     const title = document.getElementById('rl-title').value.trim();
     const desc = document.getElementById('rl-desc').value.trim();
 
-    const result = addReadLaterItem(link, title, desc, blobStore);
+    let listUrl, listTitle;
+    if (rlListSelect.value === RL_NEW) {
+        listTitle = rlNewListInput.value.trim();
+        if (!listTitle) {
+            readlaterMessage.textContent = 'Enter a name for the new list';
+            readlaterMessage.className = 'error';
+            return;
+        }
+        listUrl = readLaterUrlForName(listTitle);
+        if (!listUrl) {
+            readlaterMessage.textContent = 'Invalid list name';
+            readlaterMessage.className = 'error';
+            return;
+        }
+    } else {
+        listUrl = rlListSelect.value;
+        listTitle = rlListSelect.options[rlListSelect.selectedIndex]?.text || listUrl;
+    }
+
+    const result = addReadLaterItem(link, title, desc, blobStore, listUrl, listTitle);
 
     if (result.success) {
         readlaterMessage.textContent = 'Saved!';
@@ -550,6 +594,10 @@ readlaterForm.addEventListener('submit', (e) => {
         document.getElementById('rl-link').value = '';
         document.getElementById('rl-title').value = '';
         document.getElementById('rl-desc').value = '';
+        rlNewListInput.value = '';
+        populateReadLaterLists();
+        rlListSelect.value = listUrl;
+        rlNewListInput.classList.add('hidden');
     } else {
         readlaterMessage.textContent = result.error;
         readlaterMessage.className = 'error';

@@ -41,12 +41,16 @@
             margin-bottom: 1rem;
         }
         .feed-form .pure-form input,
-        .feed-form .pure-form textarea {
+        .feed-form .pure-form textarea,
+        .feed-form .pure-form select {
             display: block;
             width: 100%;
             max-width: 32rem;
             margin-bottom: 0.75rem;
             box-sizing: border-box;
+        }
+        .feed-form .pure-form input.hidden {
+            display: none;
         }
         .feed-form .pure-form textarea {
             min-height: 4rem;
@@ -227,6 +231,8 @@
                 <div class="feed-form">
                     <h3>Save a link to read later</h3>
                     <form id="readlater-form" class="pure-form">
+                        <select id="rl-list"></select>
+                        <input type="text" id="rl-newlist" class="hidden" placeholder="New list name">
                         <input type="url" id="rl-link" placeholder="https://example.com/article" required>
                         <input type="text" id="rl-title" placeholder="Title (optional)">
                         <textarea id="rl-desc" placeholder="Description (optional)"></textarea>
