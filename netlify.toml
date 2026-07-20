@@ -12,6 +12,6 @@
   node_bundler = "esbuild"
 
 [[redirects]]
-  from = "/feed/:token"
-  to = "/.netlify/functions/feed?token=:token"
+  from = "/feed/*"
+  to = "/.netlify/functions/feed?token=:splat"
   status = 200
