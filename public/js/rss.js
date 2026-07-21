@@ -215,36 +215,98 @@ export async function subscribeToFeed(url, store) {
     return { success: true };
 }
 
-async function validateFeed(url) {
+// Cheap heuristic: does this look like a feed rather than an HTML page? Used to
+// decide whether an entered URL is a feed or a site to run discovery on.
+function looksLikeFeed(text, contentType = '') {
+    const t = (text || '').trim().slice(0, 512).toLowerCase();
+    return contentType.includes('xml') ||
+           contentType.includes('rss') ||
+           contentType.includes('atom') ||
+           t.startsWith('<?xml') ||
+           t.startsWith('<rss') ||
+           t.startsWith('<feed');
+}
+
+// Confirm a URL actually parses as a feed with at least a recognizable structure,
+// so we never offer a broken "feed" to the user. Returns the parsed feed title when
+// available. Relies on the server-side fetch (fetch-feed) — remote content is never
+// executed, only parsed.
+async function probeFeed(url) {
     try {
         const { results, errors } = await fetchFeedBatch([url]);
-        if (errors.length > 0) {
-            return { valid: false, error: errors[0].error };
-        }
+        if (errors.length > 0) return { valid: false, error: errors[0].error };
         const data = results[0];
-        
-        if (!data || !data.text) {
-            return { valid: false, error: 'Failed to fetch feed' };
-        }
-        
-        const contentType = data.contentType || '';
-        const text = data.text;
-
-        const isRss = contentType.includes('xml') || 
-                      contentType.includes('rss') || 
-                      contentType.includes('atom') ||
-                      text.trim().startsWith('<?xml') ||
-                      text.trim().startsWith('<rss') ||
-                      text.trim().startsWith('<feed');
-
-        if (!isRss) {
-            return { valid: false, error: 'Not an RSS feed' };
-        }
-
-        return { valid: true };
+        if (!data || !data.text) return { valid: false, error: 'Failed to fetch feed' };
+        if (!looksLikeFeed(data.text, data.contentType)) return { valid: false, error: 'Not an RSS feed' };
+        // Actually parse it; a feed that yields no channel/entry structure is broken.
+        const parsed = parseFeedItems(data.text);
+        const hasFeedShape = /<rss[\s>]|<feed[\s>]/i.test(data.text) || parsed.items.length > 0;
+        if (!hasFeedShape) return { valid: false, error: 'Not a valid feed' };
+        return { valid: true, title: parsed.title || null };
     } catch (error) {
         return { valid: false, error: error.message };
     }
+}
+
+async function validateFeed(url) {
+    const r = await probeFeed(url);
+    return r.valid ? { valid: true } : { valid: false, error: r.error };
+}
+
+// Given a website (or feed) URL, discover subscribable feeds. Every candidate
+// — declared <link rel=alternate> feeds and well-known fallback paths — is fetched
+// and parsed server-side before being offered, so broken feeds are dropped.
+// Returns { feeds: [{url, title}], direct } or { error }.
+export async function discoverFeeds(url) {
+    if (!validateUrl(url)) return { error: 'Invalid URL' };
+
+    const { results, errors } = await fetchFeedBatch([url]);
+    if (errors.length > 0) return { error: errors[0].error };
+    const data = results[0];
+    if (!data || !data.text) return { error: 'Failed to fetch page' };
+
+    // Already a feed URL — confirm it parses, then offer directly.
+    if (looksLikeFeed(data.text, data.contentType)) {
+        const probe = await probeFeed(url);
+        return probe.valid ? { feeds: [{ url, title: probe.title }], direct: true }
+                           : { error: probe.error };
+    }
+
+    // Parse the HTML for advertised feeds: <link rel="alternate" type="...rss|atom...">
+    const candidates = new Map(); // url -> declared title
+    try {
+        const doc = new DOMParser().parseFromString(data.text, 'text/html');
+        for (const link of doc.querySelectorAll('link[rel~="alternate"]')) {
+            const type = (link.getAttribute('type') || '').toLowerCase();
+            if (!/rss|atom|xml/.test(type)) continue;
+            const href = link.getAttribute('href');
+            if (!href) continue;
+            try {
+                const abs = new URL(href, url).href;
+                if (!candidates.has(abs)) candidates.set(abs, link.getAttribute('title') || null);
+            } catch { /* skip malformed href */ }
+        }
+    } catch { /* HTML parse failure -> fall through to fallbacks */ }
+
+    // Fallback: probe well-known paths when nothing was advertised.
+    if (candidates.size === 0) {
+        try {
+            const origin = new URL(url);
+            for (const path of ['/feed', '/rss.xml', '/feed.xml', '/atom.xml', '/rss', '/index.xml']) {
+                candidates.set(new URL(path, origin.origin).href, null);
+            }
+        } catch { /* ignore */ }
+    }
+
+    // Validate every candidate; keep only those that actually parse as a feed.
+    const feeds = [];
+    for (const [candUrl, declaredTitle] of candidates) {
+        const probe = await probeFeed(candUrl);
+        if (probe.valid) feeds.push({ url: candUrl, title: declaredTitle || probe.title || null });
+    }
+
+    if (feeds.length === 0) return { feeds: [], error: 'No RSS feed found on this page' };
+    return { feeds, direct: false };
 }
 
 function extractUrlsFromOpml(text) {

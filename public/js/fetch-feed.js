@@ -30,7 +30,7 @@ export async function fetchFeedBatch(urls) {
             let errors = [];
             for (const r of data.results) {
                 if (r.text) {
-                    results.push({ feedUrl: r.url, text: r.text });
+                    results.push({ feedUrl: r.url, text: r.text, contentType: r.contentType || '' });
                 } else if (r.error) {
                     errors.push({ url: r.url, error: r.error });
                 }
@@ -38,7 +38,7 @@ export async function fetchFeedBatch(urls) {
             return { results, errors };
         }
         if (data.url && data.text) {
-            return { results: [{ feedUrl: data.url, text: data.text }], errors: [] };
+            return { results: [{ feedUrl: data.url, text: data.text, contentType: data.contentType || '' }], errors: [] };
         }
         if (data.url && data.error) {
             return { results: [], errors: [{ url: data.url, error: data.error }] };

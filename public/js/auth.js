@@ -1,5 +1,5 @@
 import { createBlobStore } from './blob-store.js';
-import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems, addReadLaterItem, getReadLaterLists, readLaterUrlForName } from './rss.js';
+import { subscribeToFeed, getFeeds, importFeeds, exportFeedsAsOpml, exportFeedsAsText, addItemsToFeed, updateFeedMeta, parseFeedItems, addReadLaterItem, getReadLaterLists, readLaterUrlForName, discoverFeeds } from './rss.js';
 
 const loginPage = document.getElementById('login-page');
 const userPage = document.getElementById('user-page');
@@ -569,24 +569,64 @@ loginBtn.addEventListener('click', () => {
     netlifyIdentity.open();
 });
 
-subscribeForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const url = feedUrlInput.value.trim();
-    feedMessage.textContent = 'Subscribing...';
-    feedMessage.className = '';
-    
+const discoverResults = document.getElementById('discover-results');
+
+async function doSubscribe(url, title) {
     const result = await subscribeToFeed(url, blobStore);
-    
     if (result.success) {
-        feedMessage.textContent = 'Subscribed successfully!';
+        feedMessage.textContent = title ? `Subscribed to “${title}”!` : 'Subscribed successfully!';
         feedMessage.className = 'success';
         feedUrlInput.value = '';
+        discoverResults.innerHTML = '';
         renderFeeds();
         triggerFeedScan();
     } else {
         feedMessage.textContent = result.error;
         feedMessage.className = 'error';
     }
+}
+
+subscribeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = feedUrlInput.value.trim();
+    feedMessage.textContent = 'Looking for feeds…';
+    feedMessage.className = '';
+    discoverResults.innerHTML = '';
+
+    const disco = await discoverFeeds(url);
+
+    if (disco.error && (!disco.feeds || disco.feeds.length === 0)) {
+        feedMessage.textContent = disco.error;
+        feedMessage.className = 'error';
+        return;
+    }
+
+    const feeds = disco.feeds || [];
+    if (feeds.length === 1) {
+        // Direct feed URL or a single discovered feed: subscribe straight away.
+        feedMessage.textContent = 'Subscribing…';
+        await doSubscribe(feeds[0].url, feeds[0].title);
+        return;
+    }
+
+    // Multiple feeds: let the user choose.
+    feedMessage.textContent = `Found ${feeds.length} feeds — choose one:`;
+    feedMessage.className = '';
+    discoverResults.innerHTML = feeds.map(f =>
+        `<div class="discover-row">
+            <span class="discover-feed">
+                <span class="discover-title">${escapeHtml(f.title || f.url)}</span>
+                <span class="discover-url">${escapeHtml(f.url)}</span>
+            </span>
+            <button class="pure-button pure-button-small discover-sub-btn" data-url="${escapeHtml(f.url)}" data-title="${escapeHtml(f.title || '')}">Subscribe</button>
+        </div>`
+    ).join('');
+});
+
+discoverResults.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.discover-sub-btn');
+    if (!btn) return;
+    await doSubscribe(btn.getAttribute('data-url'), btn.getAttribute('data-title') || null);
 });
 
 rlListSelect.addEventListener('change', () => {

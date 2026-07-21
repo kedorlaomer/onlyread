@@ -92,6 +92,28 @@
             background: #4caf50;
             color: #fff;
         }
+        .discover-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            max-width: 32rem;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .discover-feed {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .discover-title {
+            font-weight: 600;
+        }
+        .discover-url {
+            font-size: 0.8em;
+            color: #888;
+            word-break: break-all;
+        }
         .error {
             color: red;
             margin-top: 0.5rem;
@@ -286,10 +308,11 @@
                 <div class="feed-form">
                     <h3>Subscribe to RSS Feed</h3>
                     <form id="subscribe-form" class="pure-form">
-                        <input type="url" id="feed-url" placeholder="https://example.com/feed.xml" required>
+                        <input type="url" id="feed-url" placeholder="Website or feed URL" required>
                         <button type="submit" class="pure-button pure-button-primary">Subscribe</button>
                     </form>
                     <div id="feed-message"></div>
+                    <div id="discover-results"></div>
                 </div>
 
                 <div class="feed-form">
