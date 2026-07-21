@@ -183,7 +183,9 @@ function getUserName(user) {
 
 function renderFeeds() {
     if (!blobStore) return;
-    const feeds = getFeeds(blobStore);
+    // Manage lists real RSS subscriptions only; read-later pseudo-feeds are managed
+    // on the Read Later page.
+    const feeds = getFeeds(blobStore).filter(f => /^https?:\/\//i.test(f.url));
     if (feeds.length === 0) {
         feedsContainer.innerHTML = '<p>No feeds subscribed yet.</p>';
         return;
